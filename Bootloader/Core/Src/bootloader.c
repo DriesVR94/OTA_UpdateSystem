@@ -9,7 +9,9 @@
 
 void Bootloader_Init()
 {
-	printf("Bootloader initialised. \r\n");
+	printf("Bootloader initialized. \r\n");
+
+	// To add next: FreeRTOS. Make an application on its own for it, based on the examples from before.
 
 }
 
