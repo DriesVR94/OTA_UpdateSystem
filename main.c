@@ -78,7 +78,7 @@ static void MX_CAN1_Init(void);
 int main(void)
 {
   /* USER CODE BEGIN 1 */
-	TX = 1; // Stel hier in of het zender (1) of ontvanger (0) is.
+	TX = 0; // Stel hier in of het zender (1) of ontvanger (0) is.
 
 	LDSTAT = 0;
 	CNT = 0;
@@ -141,36 +141,37 @@ int main(void)
 					}
 
 					HAL_Delay(500);
-				} else {
-					HAL_Delay(100);
-
-					if (HAL_CAN_GetRxFifoFillLevel(&hcan1, CAN_RX_FIFO0) != 0) {
-						/* Get RX message */
-						if (HAL_CAN_GetRxMessage(&hcan1, CAN_RX_FIFO0, &RxHeader,
-								RxData) != HAL_OK) {
-							/* Reception Error */
-							Error_Handler();
-						}
-						/* Display LEDx */
-						if ((RxHeader.StdId == 0x321) && (RxHeader.IDE == CAN_ID_STD)
-								&& (RxHeader.DLC == 2)) {
-							LDSTAT = RxData[1];
-							if (LDSTAT == 0) {
-								HAL_GPIO_WritePin(GPIOB, LD1_Pin, GPIO_PIN_SET);
-								HAL_GPIO_WritePin(GPIOB, LD3_Pin | LD2_Pin,
-										GPIO_PIN_RESET);
-							} else if (LDSTAT == 1) {
-								HAL_GPIO_WritePin(GPIOB, LD2_Pin, GPIO_PIN_SET);
-								HAL_GPIO_WritePin(GPIOB, LD3_Pin | LD1_Pin,
-										GPIO_PIN_RESET);
-							} else {
-								HAL_GPIO_WritePin(GPIOB, LD3_Pin, GPIO_PIN_SET);
-								HAL_GPIO_WritePin(GPIOB, LD1_Pin | LD2_Pin,
-										GPIO_PIN_RESET);
-							}
-						}
-					}
 				}
+//					else {
+//					HAL_Delay(100);
+//
+//					if (HAL_CAN_GetRxFifoFillLevel(&hcan1, CAN_RX_FIFO0) != 0) {
+//						/* Get RX message */
+//						if (HAL_CAN_GetRxMessage(&hcan1, CAN_RX_FIFO0, &RxHeader,
+//								RxData) != HAL_OK) {
+//							/* Reception Error */
+//							Error_Handler();
+//						}
+//						/* Display LEDx */
+//						if ((RxHeader.IDE == CAN_ID_STD)
+//								&& (RxHeader.DLC == 2)) {
+//							LDSTAT = RxData[1];
+//							if (LDSTAT == 0) {
+//								HAL_GPIO_WritePin(GPIOB, LD1_Pin, GPIO_PIN_SET);
+//								HAL_GPIO_WritePin(GPIOB, LD3_Pin | LD2_Pin,
+//										GPIO_PIN_RESET);
+//							} else if (LDSTAT == 1) {
+//								HAL_GPIO_WritePin(GPIOB, LD2_Pin, GPIO_PIN_SET);
+//								HAL_GPIO_WritePin(GPIOB, LD3_Pin | LD1_Pin,
+//										GPIO_PIN_RESET);
+//							} else {
+//								HAL_GPIO_WritePin(GPIOB, LD3_Pin, GPIO_PIN_SET);
+//								HAL_GPIO_WritePin(GPIOB, LD1_Pin | LD2_Pin,
+//										GPIO_PIN_RESET);
+//							}
+//						}
+//					}
+//				}
 	}
   /* USER CODE END 3 */
 }
@@ -230,7 +231,9 @@ static void MX_CAN1_Init(void)
 {
 
   /* USER CODE BEGIN CAN1_Init 0 */
-  CAN_FilterTypeDef  sFilterConfig;
+  CAN_FilterTypeDef  sFilterConfig0;
+  CAN_FilterTypeDef  sFilterConfig1;
+  CAN_FilterTypeDef  sFilterConfig2;
   /* USER CODE END CAN1_Init 0 */
 
   /* USER CODE BEGIN CAN1_Init 1 */
@@ -253,17 +256,51 @@ static void MX_CAN1_Init(void)
     Error_Handler();
   }
   /* USER CODE BEGIN CAN1_Init 2 */
-  sFilterConfig.FilterBank = 0;
-  sFilterConfig.FilterMode = CAN_FILTERMODE_IDMASK;
-  sFilterConfig.FilterScale = CAN_FILTERSCALE_32BIT;
-  sFilterConfig.FilterIdHigh = 0x0000;
-  sFilterConfig.FilterIdLow = 0x0000;
-  sFilterConfig.FilterMaskIdHigh = 0x0000;
-  sFilterConfig.FilterMaskIdLow = 0x0000;
-  sFilterConfig.FilterFIFOAssignment = CAN_RX_FIFO0;
-  sFilterConfig.FilterActivation = ENABLE;
-  sFilterConfig.SlaveStartFilterBank = 14;
-  if (HAL_CAN_ConfigFilter(&hcan1, &sFilterConfig) != HAL_OK) {
+
+  // Configuring the filter for Application 0.
+  sFilterConfig0.FilterBank = 0;
+  sFilterConfig0.FilterMode = CAN_FILTERMODE_IDLIST;
+  sFilterConfig0.FilterScale = CAN_FILTERSCALE_32BIT;
+  sFilterConfig0.FilterIdHigh = 0x0000;
+  sFilterConfig0.FilterIdLow = 0x0000;
+  sFilterConfig0.FilterMaskIdHigh = 0x0000;
+  sFilterConfig0.FilterMaskIdLow = 0x0000;
+  sFilterConfig0.FilterFIFOAssignment = CAN_RX_FIFO0;
+  sFilterConfig0.FilterActivation = ENABLE;
+  sFilterConfig0.SlaveStartFilterBank = 14;
+  if (HAL_CAN_ConfigFilter(&hcan1, &sFilterConfig0) != HAL_OK) {
+	/* Filter configuration Error */
+	Error_Handler();
+  }
+
+  // Configuring the filter for Application 1.
+  sFilterConfig1.FilterBank = 1;
+  sFilterConfig1.FilterMode = CAN_FILTERMODE_IDLIST;
+  sFilterConfig1.FilterScale = CAN_FILTERSCALE_32BIT;
+  sFilterConfig1.FilterIdHigh = 0x0020;
+  sFilterConfig1.FilterIdLow = 0x0000;
+  sFilterConfig1.FilterMaskIdHigh = 0x0000;
+  sFilterConfig1.FilterMaskIdLow = 0x0000;
+  sFilterConfig1.FilterFIFOAssignment = CAN_RX_FIFO0;
+  sFilterConfig1.FilterActivation = ENABLE;
+  sFilterConfig1.SlaveStartFilterBank = 14;
+  if (HAL_CAN_ConfigFilter(&hcan1, &sFilterConfig1) != HAL_OK) {
+	/* Filter configuration Error */
+	Error_Handler();
+  }
+
+  // Configuring the filter for Application 2.
+  sFilterConfig2.FilterBank = 2;
+  sFilterConfig2.FilterMode = CAN_FILTERMODE_IDLIST;
+  sFilterConfig2.FilterScale = CAN_FILTERSCALE_32BIT;
+  sFilterConfig2.FilterIdHigh = 0x0040;
+  sFilterConfig2.FilterIdLow = 0x0000;
+  sFilterConfig2.FilterMaskIdHigh = 0x0000;
+  sFilterConfig2.FilterMaskIdLow = 0x0000;
+  sFilterConfig2.FilterFIFOAssignment = CAN_RX_FIFO0;
+  sFilterConfig2.FilterActivation = ENABLE;
+  sFilterConfig2.SlaveStartFilterBank = 14;
+  if (HAL_CAN_ConfigFilter(&hcan1, &sFilterConfig2) != HAL_OK) {
 	/* Filter configuration Error */
 	Error_Handler();
   }
@@ -275,8 +312,8 @@ static void MX_CAN1_Init(void)
     }
 
   /*##-5- Configure Transmission process ##*/
-  TxHeader.StdId = 0x321;
-  TxHeader.ExtId = 0x01;
+  TxHeader.StdId = 0b00000000010;
+  TxHeader.ExtId = 0x00;
   TxHeader.RTR = CAN_RTR_DATA;
   TxHeader.IDE = CAN_ID_STD;
   TxHeader.DLC = 2; // Datalengte is gelijk aan 2
@@ -378,8 +415,7 @@ void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan)
     Error_Handler();
   }
   /* Display LEDx */
-	if ((RxHeader.StdId == 0x321) && (RxHeader.IDE == CAN_ID_STD)
-			&& (RxHeader.DLC == 2)) {
+	if ((RxHeader.IDE == CAN_ID_STD) && (RxHeader.DLC == 2)) {
 		LDSTAT = RxData[1];
 		if (LDSTAT == 0) {
 			HAL_GPIO_WritePin(GPIOB, LD1_Pin, GPIO_PIN_SET);
