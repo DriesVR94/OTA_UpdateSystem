@@ -556,15 +556,12 @@ void Read_FLASH_and_Prepare_Data_for_CAN(uint32_t Sector, uint32_t StartSectorAd
     printf("Finished Read_FLASH_and_Prepare_Data_for_CAN\r\n");
 }
 
-uint32_t Read_Message_and_Write_in_FLASH(uint32_t StartSectorAddress, uint32_t EndSectorAddress, uint8_t *data, uint8_t length)
+uint32_t Read_Message_and_Write_in_FLASH(uint32_t Address, uint32_t EndSectorAddress, uint8_t *data, uint8_t length)
 {
     printf("Entering Read_Message_and_Write_in_FLASH\r\n");
-
     HAL_FLASH_Unlock();
     printf("Flash unlocked\r\n");
     board_status = RECEIVING_UPDATE;
-
-    uint32_t Address = StartSectorAddress;
 
     for (uint8_t i = 0; i < length; i++)
     {
@@ -577,8 +574,8 @@ uint32_t Read_Message_and_Write_in_FLASH(uint32_t StartSectorAddress, uint32_t E
         HAL_StatusTypeDef flash_status = HAL_FLASH_Program(FLASH_TYPEPROGRAM_BYTE, Address, data[i]);
         if (flash_status == HAL_OK)
         {
-            Address++;
             printf("Flash write successful: %02X at address %lu\r\n", data[i], Address);
+            Address++;
         }
         else
         {
@@ -772,11 +769,12 @@ void CANRxTask(void *argument)
             }
             printf("\r\n");
 
-            // Call the function to write to FLASH
-            Read_Message_and_Write_in_FLASH(FLASH_USER_START_ADDR_RX, FLASH_USER_END_ADDR_RX, pRxData, pRxHeader->DLC);
+            // Call the function to write to FLASH and update the address
+            Address = Read_Message_and_Write_in_FLASH(Address, FLASH_USER_END_ADDR_RX, pRxData, pRxHeader->DLC);
         }
     }
 }
+
 
 
 
