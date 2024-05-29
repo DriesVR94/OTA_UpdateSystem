@@ -44,13 +44,16 @@
 #define FLASH_USER_START_ADDR_TX   ADDR_FLASH_SECTOR_3_START		/* Start @ of user Flash area */
 #define FLASH_USER_START_ADDR_RX   ADDR_FLASH_SECTOR_3_START
 #define FLASH_USER_END_ADDR_TX     ADDR_FLASH_SECTOR_3_END 			/* End @ of user Flash area */
-#define FLASH_USER_END_ADDR_RX	   ADDR_FLASH_SECTOR_3_END
+#define FLASH_USER_END_ADDR_RX	   0x0800c080
 
 #define DATA_32                    ((uint32_t)0x12345678)
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
 /* USER CODE BEGIN PM */
+
+//Queue for CAN Bus
+QueueHandle_t canRxQueue;
 
 /* USER CODE END PM */
 
@@ -70,6 +73,20 @@ const osThreadAttr_t app0_attributes = {
 osThreadId_t app1Handle;
 const osThreadAttr_t app1_attributes = {
   .name = "app1",
+  .stack_size = 128 * 4,
+  .priority = (osPriority_t) osPriorityLow,
+};
+/* Definitions for app2 */
+osThreadId_t app2Handle;
+const osThreadAttr_t app2_attributes = {
+  .name = "app2",
+  .stack_size = 128 * 4,
+  .priority = (osPriority_t) osPriorityLow1,
+};
+/* Definitions for app3 */
+osThreadId_t app3Handle;
+const osThreadAttr_t app3_attributes = {
+  .name = "app3",
   .stack_size = 128 * 4,
   .priority = (osPriority_t) osPriorityLow,
 };
@@ -109,14 +126,19 @@ static void MX_USART3_UART_Init(void);
 static void MX_CAN1_Init(void);
 void StartApp0(void *argument);
 void StartApp1(void *argument);
+void StartApp2(void *argument);
+void StartApp3(void *argument);
 
 /* USER CODE BEGIN PFP */
+void CANRxTask(void *argument);
+
+
 
 /* Function prototypes for Flash Operations */
 uint32_t GetSector(uint32_t Address);
 uint32_t GetSectorSize(uint32_t Sector);
 void Read_FLASH_and_Prepare_Data_for_CAN(uint32_t Sector, uint32_t StartSectorAddress);
-uint32_t Read_Message_and_Write_in_FLASH(uint32_t StartSectorAddress, uint32_t EndSectorAddress);
+uint32_t Read_Message_and_Write_in_FLASH(uint32_t StartSectorAddress, uint32_t EndSectorAddress, uint8_t *data, uint8_t length);
 //static void sendACK(void);
 //static enum ACK_status receiveACK(void);
 /* USER CODE END PFP */
@@ -225,6 +247,15 @@ int main(void)
 
   /* USER CODE BEGIN RTOS_QUEUES */
   /* add queues, ... */
+
+  /* Create a queue capable of holding 10 CAN messages */
+  canRxQueue = xQueueCreate(10, sizeof(CAN_RxHeaderTypeDef) + sizeof(uint8_t[8]));
+  if (canRxQueue == NULL)
+  {
+      // Handle error: Queue not created
+      Error_Handler();
+  }
+
   /* USER CODE END RTOS_QUEUES */
 
   /* Create the thread(s) */
@@ -234,8 +265,24 @@ int main(void)
   /* creation of app1 */
   app1Handle = osThreadNew(StartApp1, NULL, &app1_attributes);
 
+  /* creation of app2 */
+  app2Handle = osThreadNew(StartApp2, NULL, &app2_attributes);
+
+  /* creation of app3 */
+  app3Handle = osThreadNew(StartApp3, NULL, &app3_attributes);
+
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
+
+  //thread for handling CAN messages
+
+  if (xTaskCreate(CANRxTask, "CANRxTask", 256, NULL, osPriorityNormal, NULL) != pdPASS)
+  {
+      // Handle error: Task not created
+      Error_Handler();
+  }
+
+
   /* USER CODE END RTOS_THREADS */
 
   /* USER CODE BEGIN RTOS_EVENTS */
@@ -460,6 +507,7 @@ static void MX_GPIO_Init(void)
 
 /* USER CODE BEGIN 4 */
 
+
 /* We will read the full sector. We read a byte each time and pass it to the TxData[i] of the CAN.
  * The maximum amount of data the CAN protocol can send per message is 8 bytes,
  * so we will repeat the read operation 8 times. */
@@ -508,53 +556,45 @@ void Read_FLASH_and_Prepare_Data_for_CAN(uint32_t Sector, uint32_t StartSectorAd
     printf("Finished Read_FLASH_and_Prepare_Data_for_CAN\r\n");
 }
 
-uint32_t Read_Message_and_Write_in_FLASH(uint32_t StartSectorAddress, uint32_t EndSectorAddress) {
+uint32_t Read_Message_and_Write_in_FLASH(uint32_t StartSectorAddress, uint32_t EndSectorAddress, uint8_t *data, uint8_t length)
+{
     printf("Entering Read_Message_and_Write_in_FLASH\r\n");
 
-    //osMutexAcquire(mutex_memHandle, osWaitForever);
     HAL_FLASH_Unlock();
     printf("Flash unlocked\r\n");
     board_status = RECEIVING_UPDATE;
 
-    Address = StartSectorAddress;
-    while (Address < EndSectorAddress) {
-        HAL_GPIO_TogglePin(GPIOB, LD2_Pin);
+    uint32_t Address = StartSectorAddress;
 
-        if (HAL_CAN_GetRxMessage(&hcan1, CAN_RX_FIFO0, &RxHeader_CubeSat, RxData) != HAL_OK) {
-            printf("Error receiving CAN message\r\n");
+    for (uint8_t i = 0; i < length; i++)
+    {
+        if (Address >= EndSectorAddress)
+        {
+            // Handle error: Flash address out of range
+            break;
+        }
+
+        HAL_StatusTypeDef flash_status = HAL_FLASH_Program(FLASH_TYPEPROGRAM_BYTE, Address, data[i]);
+        if (flash_status == HAL_OK)
+        {
+            Address++;
+            printf("Flash write successful: %02X at address %lu\r\n", data[i], Address);
+        }
+        else
+        {
+            printf("Flash write failed: status=%d\r\n", flash_status);
+            HAL_FLASH_Lock();
             Error_Handler();
-        }
-        //printf("Received CAN message, starting to write to Flash\r\n");
-
-        // Print the complete RxData array
-        printf("Received RxData: ");
-        for (int i = 0; i < 8; i++) {
-            printf("%02X ", RxData[i]);
-        }
-        printf("\r\n");
-
-        for (int i = 0; i < 8; i++) {
-            //printf("Preparing to write to Flash: %02X at address %lu\r\n", RxData[i], Address);
-            HAL_StatusTypeDef flash_status = HAL_FLASH_Program(FLASH_TYPEPROGRAM_BYTE, Address, RxData[i]);
-            if (flash_status == HAL_OK) {
-               Address++;
-               printf("Flash write successful: %02X at address %lu\r\n", RxData[i], Address);
-               osDelay(2000);
-            } else {
-                printf("Flash write failed: status=%d\r\n", flash_status);
-                HAL_FLASH_Lock();
-                Error_Handler();
-            }
         }
     }
 
     HAL_FLASH_Lock();
     printf("Flash locked\r\n");
     board_status = UPDATE_FINISHED;
-    //osMutexRelease(mutex_memHandle);
     printf("Exiting Read_Message_and_Write_in_FLASH\r\n");
     return Address;
 }
+
 
 
 /* When a message is received, we need to read it and write it in the Flash memory of the receiving board. */
@@ -679,9 +719,20 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){
 
 void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan)
 {
-	printf("in the receiver's callback \r\n");
-	Read_Message_and_Write_in_FLASH(Address, FLASH_USER_END_ADDR_RX);
+    BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+    uint8_t buffer[sizeof(CAN_RxHeaderTypeDef) + sizeof(uint8_t[8])];
+    CAN_RxHeaderTypeDef *pRxHeader = (CAN_RxHeaderTypeDef *)buffer;
+    uint8_t *pRxData = buffer + sizeof(CAN_RxHeaderTypeDef);
 
+    // Get the message
+    if (HAL_CAN_GetRxMessage(hcan, CAN_RX_FIFO0, pRxHeader, pRxData) == HAL_OK)
+    {
+        // Send the message to the queue
+        xQueueSendFromISR(canRxQueue, buffer, &xHigherPriorityTaskWoken);
+    }
+
+    // Perform a context switch if required
+    portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
 }
 
 
@@ -697,6 +748,46 @@ int fputc(int ch, FILE *f)
 	HAL_UART_Transmit(&huart3, (uint8_t *)&ch, 1, HAL_MAX_DELAY);
 	return ch;
 }
+
+
+
+
+//Task that handles RX
+void CANRxTask(void *argument)
+{
+    uint8_t buffer[sizeof(CAN_RxHeaderTypeDef) + sizeof(uint8_t[8])];
+    CAN_RxHeaderTypeDef *pRxHeader = (CAN_RxHeaderTypeDef *)buffer;
+    uint8_t *pRxData = buffer + sizeof(CAN_RxHeaderTypeDef);
+
+    while (1)
+    {
+        // Wait for data to be available in the queue
+        if (xQueueReceive(canRxQueue, buffer, portMAX_DELAY) == pdPASS)
+        {
+            // Process the received message
+            printf("Received CAN message with ID: 0x%03lX\r\n", (unsigned long)pRxHeader->StdId);
+            for (int i = 0; i < pRxHeader->DLC; i++)
+            {
+                printf("%02X ", pRxData[i]);
+            }
+            printf("\r\n");
+
+            // Call the function to write to FLASH
+            Read_Message_and_Write_in_FLASH(FLASH_USER_START_ADDR_RX, FLASH_USER_END_ADDR_RX, pRxData, pRxHeader->DLC);
+        }
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
 /* USER CODE END 4 */
 
 /* USER CODE BEGIN Header_StartApp0 */
@@ -775,6 +866,44 @@ void StartApp1(void *argument)
 
   }
   /* USER CODE END StartApp1 */
+}
+
+/* USER CODE BEGIN Header_StartApp2 */
+/**
+* @brief Function implementing the app2 thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartApp2 */
+void StartApp2(void *argument)
+{
+  /* USER CODE BEGIN StartApp2 */
+  /* Infinite loop */
+  for(;;)
+  {
+	  application2();
+	  osDelay(1000);
+  }
+  /* USER CODE END StartApp2 */
+}
+
+/* USER CODE BEGIN Header_StartApp3 */
+/**
+* @brief Function implementing the app3 thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartApp3 */
+void StartApp3(void *argument)
+{
+  /* USER CODE BEGIN StartApp3 */
+  /* Infinite loop */
+  for(;;)
+  {
+	  application3();
+	  osDelay(1000);
+  }
+  /* USER CODE END StartApp3 */
 }
 
 /**

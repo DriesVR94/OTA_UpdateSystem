@@ -10,6 +10,7 @@
 
 void application1(void);
 void application2(void);
+void application3(void);
 
 #endif /* INC_APPLICATIONS_H_ */
 

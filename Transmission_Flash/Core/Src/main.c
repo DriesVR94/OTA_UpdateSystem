@@ -464,7 +464,8 @@ void Read_FLASH_and_Prepare_Data_for_CAN(uint32_t Sector, uint32_t StartSectorAd
 	/* Unlock the Flash to enable the flash control register access. */
 	HAL_FLASH_Unlock();
 	/* Since sectors can have different length, we need to calculate how many bytes need to be read. */
-	uint32_t nrOfBytes = GetSectorSize(Sector);
+	//uint32_t nrOfBytes = GetSectorSize(Sector);
+	uint32_t nrOfBytes =120;
 	//uint32_t sector = Sector;
 
  	while (nrOfBytes != 0){

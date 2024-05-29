@@ -60,6 +60,20 @@ const osThreadAttr_t App1_attributes = {
   .stack_size = 128 * 4,
   .priority = (osPriority_t) osPriorityNormal,
 };
+/* Definitions for App2 */
+osThreadId_t App2Handle;
+const osThreadAttr_t App2_attributes = {
+  .name = "App2",
+  .stack_size = 128 * 4,
+  .priority = (osPriority_t) osPriorityLow,
+};
+/* Definitions for App3 */
+osThreadId_t App3Handle;
+const osThreadAttr_t App3_attributes = {
+  .name = "App3",
+  .stack_size = 128 * 4,
+  .priority = (osPriority_t) osPriorityLow,
+};
 /* USER CODE BEGIN PV */
 
 /* USER CODE END PV */
@@ -70,6 +84,8 @@ static void MX_GPIO_Init(void);
 static void MX_SPI1_Init(void);
 static void MX_USART2_UART_Init(void);
 void StartApp1(void *argument);
+void StartApp2(void *argument);
+void StartApp3(void *argument);
 
 /* USER CODE BEGIN PFP */
 
@@ -122,8 +138,10 @@ int main(void)
   /* USER CODE BEGIN 2 */
   printf("Starting System...\r\n");
 
-  Flash_ChipErase();
-  printf("Flash_ChipErase Performed\r\n");
+  //Flash_ChipErase();
+  uint8_t *ptr1 = (uint8_t *)0x0801000; //Sector 4 Address
+  SPI_Flash_Write(0x90000000,ptr1,200);
+  printf("Flash copy Performed\r\n");
 
   void Init();
 
@@ -152,6 +170,12 @@ int main(void)
   /* Create the thread(s) */
   /* creation of App1 */
   App1Handle = osThreadNew(StartApp1, NULL, &App1_attributes);
+
+  /* creation of App2 */
+  App2Handle = osThreadNew(StartApp2, NULL, &App2_attributes);
+
+  /* creation of App3 */
+  App3Handle = osThreadNew(StartApp3, NULL, &App3_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
@@ -281,7 +305,7 @@ static void MX_SPI1_Init(void)
   hspi1.Init.CLKPolarity = SPI_POLARITY_LOW;
   hspi1.Init.CLKPhase = SPI_PHASE_1EDGE;
   hspi1.Init.NSS = SPI_NSS_SOFT;
-  hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_2;
+  hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_4;
   hspi1.Init.FirstBit = SPI_FIRSTBIT_MSB;
   hspi1.Init.TIMode = SPI_TIMODE_DISABLE;
   hspi1.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
@@ -384,7 +408,7 @@ void Init() {
 
 //interrupt handling
 
-bool flag1 = 0;
+int flag1 = 0;
 
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
     if (GPIO_Pin == GPIO_PIN_13) {
@@ -393,7 +417,7 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
 		  printf("Attending interrupt 1 \r\n");
 
 		  // Access critical section here
-		  // Flash operations, etc.
+		  // Flash operations, etc
 
 
         }
@@ -419,22 +443,67 @@ void StartApp1(void *argument)
 		    application1();
 		    osDelay(1000);
 	  }
-	  else{
+	  if (flag1 ==1){
 		  // Take (lock) the mutex before accessing critical section
 		  int size = GetSectorSize(ADDR_FLASH_SECTOR_4)/4;
-		  printf("the size of the copy will be: %d \r\n", size);
-		  printf("performing sector copy\r\n");
-		  uint8_t *ptr1 = (uint8_t *)0x8010000; //Sector 4 Address
-		  SPI_Flash_Write(0x90010000,ptr1,size);
-		  printf("Changing code form flash r\n");
-		  CopyCodeFromSPIFlash(0x90010000, 0x8020000,size);
+		  printf("the size of the copy will be: %d bytes\r\n", size);
+		  printf("performing sector copy in external flash memory\r\n");
+		  osDelay(2000);
+		  //uint8_t *ptr1 = (uint8_t *)0x8010000; //Sector 4 Address
+		  //SPI_Flash_Write(0x90020000,ptr1,size);
+		  printf("ready to start update \r\n");
+		  //printf("Changing code form flash r\n");
+		  //CopyCodeFromSPIFlash(0x90010000, 0x8020000,size);
+		  osDelay(1500);
 		  printf("ready to relaunch\r\n");
-		  flag1 = 0;
-
+		  flag1 = 2;
+	  }
+	  if (flag1 ==2)
+	  {
+		  application11();
+		  osDelay(999);
 	  }
 
   }
   /* USER CODE END 5 */
+}
+
+/* USER CODE BEGIN Header_StartApp2 */
+/**
+* @brief Function implementing the App2 thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartApp2 */
+void StartApp2(void *argument)
+{
+  /* USER CODE BEGIN StartApp2 */
+  /* Infinite loop */
+  for(;;)
+  {
+	  application2();
+	  osDelay(998);
+  }
+  /* USER CODE END StartApp2 */
+}
+
+/* USER CODE BEGIN Header_StartApp3 */
+/**
+* @brief Function implementing the App3 thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartApp3 */
+void StartApp3(void *argument)
+{
+  /* USER CODE BEGIN StartApp3 */
+  /* Infinite loop */
+  for(;;)
+  {
+	  application3();
+	  osDelay(1000);
+  }
+  /* USER CODE END StartApp3 */
 }
 
 /**

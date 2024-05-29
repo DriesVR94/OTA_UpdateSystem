@@ -48,8 +48,14 @@ MEMORY
   FLASH    (rx)    : ORIGIN = 0x8000000,   LENGTH = 512K
   SPI_FLASH (r)    : ORIGIN = 0x90000000,  LENGTH = 8M 
   
+  /*Main memory allocation :*/
+  APPLICATION_0		(rx) 	: ORIGIN = 0x08060000,		LENGTH = 128K  	/* Secor 7 */
+  
   /* Custom applications */
-  APPLICATION_1		(rx)	: ORIGIN = 0x8010000,		LENGTH = 64K	/* Sector 3 */
+  APPLICATION_1		(rx)	: ORIGIN = 0x8010000,		LENGTH = 32K	/* Sector 3 */
+  APPLICATION_11	(rx)	: ORIGIN = 0x801C000,		LENGTH = 32k
+  APPLICATION_2		(rx)	: ORIGIN = 0x8020000,		LENGTH = 32K	/* Sector 5 */
+  APPLICATION_3		(rx)	: ORIGIN = 0x802C000,		LENGTH = 32K
   
 }
 
@@ -76,6 +82,20 @@ SECTIONS
     *(.custom_section1)
 	} > APPLICATION_1
   
+    .custom_section2 :
+  {
+    *(.custom_section2)
+	} > APPLICATION_11
+  
+      .custom_section3 :
+  {
+    *(.custom_section3)
+	} > APPLICATION_2
+	
+	    .custom_section4 :
+  {
+    *(.custom_section4)
+	} > APPLICATION_3
 
   
   /* The startup code into "FLASH" Rom type memory */
@@ -101,7 +121,7 @@ SECTIONS
 
     . = ALIGN(4);
     _etext = .;        /* define a global symbols at end of code */
-  } >FLASH
+  } >APPLICATION_0	
 
   /* Constant data into "FLASH" Rom type memory */
   .rodata :
@@ -110,7 +130,7 @@ SECTIONS
     *(.rodata)         /* .rodata sections (constants, strings, etc.) */
     *(.rodata*)        /* .rodata* sections (constants, strings, etc.) */
     . = ALIGN(4);
-  } >FLASH
+  } >APPLICATION_0	
 
   .ARM.extab   : {
     . = ALIGN(4);
@@ -171,7 +191,7 @@ SECTIONS
     . = ALIGN(4);
     _edata = .;        /* define a global symbol at data end */
 
-  } >RAM AT> FLASH
+  } >RAM AT> APPLICATION_0	
 
   /* Uninitialized data section into "RAM" Ram type memory */
   . = ALIGN(4);

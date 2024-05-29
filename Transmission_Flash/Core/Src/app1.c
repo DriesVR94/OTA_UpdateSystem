@@ -10,7 +10,7 @@
 
 void __attribute__((section(".custom_section1"))) app1 (void)
 {
-	printf("in app 1 \r\n");
+	printf("in app 1.1 \r\n");
 }
 
 
