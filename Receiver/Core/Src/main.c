@@ -41,10 +41,10 @@
  * The receiving board will also store the update in sector 7. The sector choice is just an arbitrary decision.
  * Any other sector can be chosen too, as long as it doesn't conflict with firmware code. */
 
-#define FLASH_USER_START_ADDR_TX   ADDR_FLASH_SECTOR_3_START		/* Start @ of user Flash area */
-#define FLASH_USER_START_ADDR_RX   ADDR_FLASH_SECTOR_3_START
-#define FLASH_USER_END_ADDR_TX     ADDR_FLASH_SECTOR_3_END 			/* End @ of user Flash area */
-#define FLASH_USER_END_ADDR_RX	   0x0800c080
+#define FLASH_USER_START_ADDR_TX   ADDR_FLASH_SECTOR_4_START		/* Start @ of user Flash area */
+#define FLASH_USER_START_ADDR_RX   ADDR_FLASH_SECTOR_4_START
+#define FLASH_USER_END_ADDR_TX     ADDR_FLASH_SECTOR_4_END 			/* End @ of user Flash area */
+#define FLASH_USER_END_ADDR_RX	   ADDR_FLASH_SECTOR_4_END
 
 #define DATA_32                    ((uint32_t)0x12345678)
 /* USER CODE END PD */
@@ -117,6 +117,10 @@ uint8_t TxBuffer;
 /*Variable used for Flash Erase procedure*/
 static FLASH_EraseInitTypeDef EraseInitStruct;
 
+bool flashUpdateDone = false;
+bool flashErased = false;  // Add this line to declare the flashErased variable
+bool updateComplete = false;
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -131,7 +135,7 @@ void StartApp3(void *argument);
 
 /* USER CODE BEGIN PFP */
 void CANRxTask(void *argument);
-
+void SystemReset(void);
 
 
 /* Function prototypes for Flash Operations */
@@ -145,7 +149,7 @@ uint32_t Read_Message_and_Write_in_FLASH(uint32_t StartSectorAddress, uint32_t E
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-bool flag1 = 0;
+
 
 /* USER CODE END 0 */
 
@@ -190,42 +194,7 @@ int main(void)
  HAL_CAN_Start(&hcan1);
 
 
-  if (!TX){
 
-  	  /* Unlock the Flash to enable the flash control register access */
-  	  HAL_FLASH_Unlock();
-
-  	  /* Erase the user Flash area defined by FLASH_USER_START_ADDR_RX and FLASH_USER_END_ADDR_RX) */
-
-  	  /* Get the 1st sector to erase */
-  	  FirstSector = GetSector(FLASH_USER_START_ADDR_RX);
-  	  /* Get the number of sector to erase from 1st sector*/
-  	  NbOfSectors = GetSector(FLASH_USER_END_ADDR_RX) - FirstSector + 1;
-  	  /* Fill EraseInit structure*/
-  	  EraseInitStruct.TypeErase     = FLASH_TYPEERASE_SECTORS;
-  	  EraseInitStruct.VoltageRange  = FLASH_VOLTAGE_RANGE_3;
-  	  EraseInitStruct.Sector        = FirstSector;
-  	  EraseInitStruct.NbSectors     = NbOfSectors;
-
-  	  if (HAL_FLASHEx_Erase(&EraseInitStruct, &SECTORError) != HAL_OK)
-  	  {
-  	    /*
-  	      Error occurred while sector erase.
-  	      User can add here some code to deal with this error.
-  	      SECTORError will contain the faulty sector and then to know the code error on this sector,
-  	      user can call function 'HAL_FLASH_GetError()'
-  	    */
-  	    /* Infinite loop */
-//  	    while (1)
-//  	    {
-//  	    	HAL_GPIO_WritePin(GPIOB, LD3_Pin, GPIO_PIN_SET);
-//  	    }
-  	  }
-
-  	  /* Add a small delay so the Flash erase can be completed before the CAN is started. */
-  	  //osDelay(2000);
-  	  HAL_FLASH_Lock();
-    }
 
 
   /* USER CODE END 2 */
@@ -556,41 +525,6 @@ void Read_FLASH_and_Prepare_Data_for_CAN(uint32_t Sector, uint32_t StartSectorAd
     printf("Finished Read_FLASH_and_Prepare_Data_for_CAN\r\n");
 }
 
-uint32_t Read_Message_and_Write_in_FLASH(uint32_t Address, uint32_t EndSectorAddress, uint8_t *data, uint8_t length)
-{
-    printf("Entering Read_Message_and_Write_in_FLASH\r\n");
-    HAL_FLASH_Unlock();
-    printf("Flash unlocked\r\n");
-    board_status = RECEIVING_UPDATE;
-
-    for (uint8_t i = 0; i < length; i++)
-    {
-        if (Address >= EndSectorAddress)
-        {
-            // Handle error: Flash address out of range
-            break;
-        }
-
-        HAL_StatusTypeDef flash_status = HAL_FLASH_Program(FLASH_TYPEPROGRAM_BYTE, Address, data[i]);
-        if (flash_status == HAL_OK)
-        {
-            printf("Flash write successful: %02X at address %lu\r\n", data[i], Address);
-            Address++;
-        }
-        else
-        {
-            printf("Flash write failed: status=%d\r\n", flash_status);
-            HAL_FLASH_Lock();
-            Error_Handler();
-        }
-    }
-
-    HAL_FLASH_Lock();
-    printf("Flash locked\r\n");
-    board_status = UPDATE_FINISHED;
-    printf("Exiting Read_Message_and_Write_in_FLASH\r\n");
-    return Address;
-}
 
 
 
@@ -747,9 +681,75 @@ int fputc(int ch, FILE *f)
 }
 
 
+uint32_t Read_Message_and_Write_in_FLASH(uint32_t Address, uint32_t EndSectorAddress, uint8_t *data, uint8_t length)
+{
+    printf("Entering Read_Message_and_Write_in_FLASH\r\n");
+    HAL_FLASH_Unlock();
+    printf("Flash unlocked\r\n");
+    board_status = RECEIVING_UPDATE;
+
+    // Erase the sector only once before writing the data
+    if (!flashErased)
+    {
+
+        /* Get the 1st sector to erase */
+        FirstSector = GetSector(Address);
+        /* Get the number of sectors to erase */
+        NbOfSectors = 1; // Assuming only one sector needs to be erased
+        /* Fill EraseInit structure */
+        EraseInitStruct.TypeErase     = FLASH_TYPEERASE_SECTORS;
+        EraseInitStruct.VoltageRange  = FLASH_VOLTAGE_RANGE_3;
+        EraseInitStruct.Sector        = FirstSector;
+        EraseInitStruct.NbSectors     = NbOfSectors;
+
+        if (HAL_FLASHEx_Erase(&EraseInitStruct, &SECTORError) != HAL_OK)
+        {
+            printf("Error erasing flash sector\r\n");
+            HAL_FLASH_Lock();
+            return Address;
+        }
+        else
+        {
+            printf("Flash sector erased successfully\r\n");
+            flashErased = true;
+        }
+    }
+
+    for (uint8_t i = 0; i < length; i++)
+    {
+        if (Address >= EndSectorAddress)
+        {
+            // Handle error: Flash address out of range
+            printf("Flash address out of range\r\n");
+            break;
+        }
+
+        HAL_StatusTypeDef flash_status = HAL_FLASH_Program(FLASH_TYPEPROGRAM_BYTE, Address, data[i]);
+        if (flash_status == HAL_OK)
+        {
+            printf("Flash write successful: %02X at address %lu\r\n", data[i], Address);
+            Address++;
+        }
+        else
+        {
+            printf("Flash write failed: status=%d\r\n", flash_status);
+            HAL_FLASH_Lock();
+            Error_Handler();
+        }
+    }
+
+    HAL_FLASH_Lock();
+    printf("Flash locked\r\n");
+
+    printf("Exiting Read_Message_and_Write_in_FLASH\r\n");
+    return Address;
+}
 
 
 //Task that handles RX
+
+
+// Updated CANRxTask
 void CANRxTask(void *argument)
 {
     uint8_t buffer[sizeof(CAN_RxHeaderTypeDef) + sizeof(uint8_t[8])];
@@ -771,11 +771,32 @@ void CANRxTask(void *argument)
 
             // Call the function to write to FLASH and update the address
             Address = Read_Message_and_Write_in_FLASH(Address, FLASH_USER_END_ADDR_RX, pRxData, pRxHeader->DLC);
+
+            // Set the update complete flag when the last chunk is received and written
+            if (Address >= 0x8010057)
+            {
+                updateComplete = true;
+            }
+        }
+
+        // Check if update is complete and reset the system
+        if (updateComplete)
+        {
+            HAL_Delay(100); // Small delay to ensure all operations are complete
+            SystemReset();
         }
     }
 }
 
 
+#include "stm32f4xx_hal.h"
+
+// Function to trigger a system reset
+void SystemReset(void)
+{
+    printf("System resetting...\r\n");
+    HAL_NVIC_SystemReset();
+}
 
 
 
@@ -856,11 +877,9 @@ void StartApp1(void *argument)
   /* Infinite loop */
   for(;;)
   {
-	if(!flag1)
-	{
+
 		application1();
-	}
-    osDelay(1000);
+		osDelay(1000);
 
   }
   /* USER CODE END StartApp1 */

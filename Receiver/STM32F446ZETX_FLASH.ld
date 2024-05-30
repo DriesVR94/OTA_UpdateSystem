@@ -52,7 +52,7 @@ MEMORY
   APPLICATION_0		(rx) 	: ORIGIN = 0x08060000,		LENGTH = 128K  	/* Secor 7 */
   
   /* Custom applications */
-  APPLICATION_1		(rx)	: ORIGIN = 0x8010000,		LENGTH = 32K	/* Sector 3 */
+  APPLICATION_1		(rx)	: ORIGIN = 0x8010000,		LENGTH = 64K	/* Sector 3 */
   APPLICATION_2		(rx)	: ORIGIN = 0x8020000,		LENGTH = 32K	/* Sector 5 */
   APPLICATION_3		(rx)	: ORIGIN = 0x802C000,		LENGTH = 32K
   
