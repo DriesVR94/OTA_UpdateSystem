@@ -34,6 +34,9 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+
+#define MAJOR 0
+#define MINOR 0
 /* Before transmitting, we will program the update in Sector 7 ( = its last sector) of one of the F446 boards.
  * Programming a .bin file in the Flash memory is done through the STM32CubeProgrammer application.
  * This update will then be send to the second F446 board through the CAN bus. Here, we use wires to simulate this process.
@@ -41,10 +44,12 @@
  * The receiving board will also store the update in sector 7. The sector choice is just an arbitrary decision.
  * Any other sector can be chosen too, as long as it doesn't conflict with firmware code. */
 
-#define FLASH_USER_START_ADDR_TX   ADDR_FLASH_SECTOR_4_START		/* Start @ of user Flash area */
-#define FLASH_USER_START_ADDR_RX   ADDR_FLASH_SECTOR_4_START
-#define FLASH_USER_END_ADDR_TX     ADDR_FLASH_SECTOR_4_END 			/* End @ of user Flash area */
-#define FLASH_USER_END_ADDR_RX	   ADDR_FLASH_SECTOR_4_END
+#define FLASH_USER_START_ADDR_TX   ADDR_FLASH_SECTOR_5_START		/* Start @ of user Flash area */
+#define FLASH_USER_START_ADDR_RX   ADDR_FLASH_SECTOR_5_START
+#define FLASH_USER_END_ADDR_TX     ADDR_FLASH_SECTOR_5_END 			/* End @ of user Flash area */
+#define FLASH_USER_END_ADDR_RX	   ADDR_FLASH_SECTOR_5_END
+
+#define APPLICATION_START_ADDR      0x8000000
 
 #define DATA_32                    ((uint32_t)0x12345678)
 /* USER CODE END PD */
@@ -92,6 +97,8 @@ const osThreadAttr_t app3_attributes = {
 };
 /* USER CODE BEGIN PV */
 
+
+const uint8_t			APP_Version[2]={MAJOR, MINOR};
 // Define whether the board will be sending or receiving.
 uint8_t			      	TX;
 
@@ -120,6 +127,8 @@ static FLASH_EraseInitTypeDef EraseInitStruct;
 bool flashUpdateDone = false;
 bool flashErased = false;  // Add this line to declare the flashErased variable
 bool updateComplete = false;
+bool taskCreated = false;
+bool flag1;
 
 /* USER CODE END PV */
 
@@ -133,9 +142,13 @@ void StartApp1(void *argument);
 void StartApp2(void *argument);
 void StartApp3(void *argument);
 
+void StartApp1_1(void *argument);
+
 /* USER CODE BEGIN PFP */
 void CANRxTask(void *argument);
 void SystemReset(void);
+void StopAllThreads(void);
+void RebootToApplication(void);
 
 
 /* Function prototypes for Flash Operations */
@@ -192,9 +205,6 @@ int main(void)
 
   /* Start the CAN and enable interrupts*/
  HAL_CAN_Start(&hcan1);
-
-
-
 
 
   /* USER CODE END 2 */
@@ -538,7 +548,7 @@ void Read_FLASH_and_Prepare_Data_for_CAN(uint32_t Sector, uint32_t StartSectorAd
 //
 //	TxData[0] = 0x11;
 //	HAL_CAN_AddTxMessage(&hcan1 , &TxHeader_CubeSat, TxData, &TxMailbox);
-//}
+//}FLASH_USER_END_ADDR_RX
 //
 //enum ACK_status receiveACK(){
 //
@@ -688,33 +698,6 @@ uint32_t Read_Message_and_Write_in_FLASH(uint32_t Address, uint32_t EndSectorAdd
     printf("Flash unlocked\r\n");
     board_status = RECEIVING_UPDATE;
 
-    // Erase the sector only once before writing the data
-    if (!flashErased)
-    {
-
-        /* Get the 1st sector to erase */
-        FirstSector = GetSector(Address);
-        /* Get the number of sectors to erase */
-        NbOfSectors = 1; // Assuming only one sector needs to be erased
-        /* Fill EraseInit structure */
-        EraseInitStruct.TypeErase     = FLASH_TYPEERASE_SECTORS;
-        EraseInitStruct.VoltageRange  = FLASH_VOLTAGE_RANGE_3;
-        EraseInitStruct.Sector        = FirstSector;
-        EraseInitStruct.NbSectors     = NbOfSectors;
-
-        if (HAL_FLASHEx_Erase(&EraseInitStruct, &SECTORError) != HAL_OK)
-        {
-            printf("Error erasing flash sector\r\n");
-            HAL_FLASH_Lock();
-            return Address;
-        }
-        else
-        {
-            printf("Flash sector erased successfully\r\n");
-            flashErased = true;
-        }
-    }
-
     for (uint8_t i = 0; i < length; i++)
     {
         if (Address >= EndSectorAddress)
@@ -756,6 +739,13 @@ void CANRxTask(void *argument)
     CAN_RxHeaderTypeDef *pRxHeader = (CAN_RxHeaderTypeDef *)buffer;
     uint8_t *pRxData = buffer + sizeof(CAN_RxHeaderTypeDef);
 
+    // Declare the app1_1_attributes at the beginning of the function
+    osThreadAttr_t app1_1_attributes = {
+        .name = "app1.1",
+        .stack_size = 128 * 4,
+        .priority = (osPriority_t) osPriorityLow,
+    };
+
     while (1)
     {
         // Wait for data to be available in the queue
@@ -769,27 +759,73 @@ void CANRxTask(void *argument)
             }
             printf("\r\n");
 
+            // Erase the sector only once before writing the data
+            if (!flashErased)
+            {
+                //First we delete thread of app1
+                printf("Deleting App1 thread");
+
+                // Delete this task (app1) after the flag is set, indicating an update
+                vTaskDelete(app1Handle);
+                // Set the handle to NULL to indicate the task is deleted
+                app1Handle = NULL;
+
+                /* Get the 1st sector to erase */
+                FirstSector = GetSector(Address);
+                /* Get the number of sectors to erase */
+                NbOfSectors = 1; // Assuming only one sector needs to be erased
+                /* Fill EraseInit structure */
+                EraseInitStruct.TypeErase     = FLASH_TYPEERASE_SECTORS;
+                EraseInitStruct.VoltageRange  = FLASH_VOLTAGE_RANGE_3;
+                EraseInitStruct.Sector        = FirstSector;
+                EraseInitStruct.NbSectors     = NbOfSectors;
+
+                if (HAL_FLASHEx_Erase(&EraseInitStruct, &SECTORError) != HAL_OK)
+                {
+                    printf("Error erasing flash sector\r\n");
+                    HAL_FLASH_Lock();
+                }
+                else
+                {
+                    printf("Flash sector erased successfully\r\n");
+                    flashErased = true;
+                }
+            }
+
             // Call the function to write to FLASH and update the address
             Address = Read_Message_and_Write_in_FLASH(Address, FLASH_USER_END_ADDR_RX, pRxData, pRxHeader->DLC);
 
+
             // Set the update complete flag when the last chunk is received and written
-            if (Address >= 0x8010057)
+            if (Address >= 0x8020056)
             {
                 updateComplete = true;
+
             }
         }
 
         // Check if update is complete and reset the system
         if (updateComplete)
         {
-            HAL_Delay(100); // Small delay to ensure all operations are complete
+        	printf("Update completed \r\n");
+            //osDelay(3000);    //Safety delay for launching it
+
+//            printf("Cerating a new task \r\n");
+//
+//
+//
+//            osThreadNew(StartApp1_1, NULL, &app1_1_attributes);
+
+
             SystemReset();
         }
+
     }
 }
 
 
-#include "stm32f4xx_hal.h"
+
+
 
 // Function to trigger a system reset
 void SystemReset(void)
@@ -798,12 +834,26 @@ void SystemReset(void)
     HAL_NVIC_SystemReset();
 }
 
+void StopAllThreads(void)
+{
+    vTaskSuspend(app1Handle);
+    vTaskSuspend(app2Handle);
+    vTaskSuspend(app3Handle);
+    // Add suspensions for any other threads if necessary
+}
 
 
+void StartApp1_1(void *argument)
+{
+  for(;;)
+  {
+      //printf("Hello from app 1.1\r\n");
 
-
-
-
+	  printf("About to try to relaunch with a new task \r\n");
+      //application1();
+      osDelay(1000);
+  }
+}
 
 
 
@@ -873,17 +923,16 @@ void StartApp0(void *argument)
 /* USER CODE END Header_StartApp1 */
 void StartApp1(void *argument)
 {
-  /* USER CODE BEGIN StartApp1 */
-  /* Infinite loop */
   for(;;)
   {
 
-		application1();
-		osDelay(1000);
+	  application1();
+	  osDelay(1000);
 
   }
   /* USER CODE END StartApp1 */
 }
+
 
 /* USER CODE BEGIN Header_StartApp2 */
 /**

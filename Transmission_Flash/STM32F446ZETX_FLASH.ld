@@ -45,15 +45,15 @@ _Min_Stack_Size = 0x400; /* required amount of stack */
 MEMORY
 {
   RAM    (xrw)    : ORIGIN = 0x20000000,   LENGTH = 128K
-  FLASH    (rx)    : ORIGIN = 0x8000000,   LENGTH = 512K
+  FLASH    (rx)    : ORIGIN = 0x08010000 , LENGTH = 448K
+  SPI_FLASH (r)    : ORIGIN = 0x90000000,  LENGTH = 8M 
   
   /* Here, we assign each application/subsystem a specific part in memory.
    * Note that the start and end of our custom sections must always coincide with the start and end of a sector 
    * as defined in Reference Manual 0390 for the STM32F446ZETx. */
-  APPLICATION_1		(rx)	: ORIGIN = 0x0800C000,		LENGTH = 16K	/* Sector 3 */
-  APPLICATION_2		(rx)	: ORIGIN = 0x08010000, 		LENGTH = 64K	/* Sector 4 */
-  APPLICATION_3		(rx)	: ORIGIN = 0x08020000, 		LENGTH = 128K	/* Sector 5 */
-  APPLICATION_4		(rx)	: ORIGIN = 0x08040000, 		LENGTH = 128K	/* Sector 6 */
+  APPLICATION_1		(rx)	: ORIGIN = 0x8020000,		LENGTH = 64K
+  APPLICATION_2		(rx)	: ORIGIN = 0x8040000,		LENGTH = 128K	
+  APPLICATION_3		(rx)	: ORIGIN = 0x8060000,		LENGTH = 128K
 }
 
 /* Sections */
