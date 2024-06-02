@@ -103,10 +103,8 @@ const uint8_t			APP_Version[2]={MAJOR, MINOR};
 uint8_t			      	TX;
 
 // CAN variables
-CAN_TxHeaderTypeDef   	TxHeader_GroundStation;
-CAN_TxHeaderTypeDef   	TxHeader_CubeSat;
-CAN_RxHeaderTypeDef   	RxHeader_GroundStation;
-CAN_RxHeaderTypeDef   	RxHeader_CubeSat;
+CAN_TxHeaderTypeDef   	TxHeader;
+CAN_RxHeaderTypeDef   	RxHeader;
 uint8_t               	TxData[8];
 uint8_t               	RxData[8];
 uint32_t              	TxMailbox;
@@ -392,19 +390,19 @@ static void MX_CAN1_Init(void)
       Error_Handler();
     }
 
-  TxHeader_GroundStation.StdId = 0b00000000000;
-  TxHeader_GroundStation.ExtId = 0x00;
-  TxHeader_GroundStation.RTR = CAN_RTR_DATA;
-  TxHeader_GroundStation.IDE = CAN_ID_STD;
-  TxHeader_GroundStation.DLC = 8; // Data length is equal to 8
-  TxHeader_GroundStation.TransmitGlobalTime = DISABLE;
+  TxHeader.StdId = 0b00000000000;
+  TxHeader.ExtId = 0x00;
+  TxHeader.RTR = CAN_RTR_DATA;
+  TxHeader.IDE = CAN_ID_STD;
+  TxHeader.DLC = 8; // Data length is equal to 8
+  TxHeader.TransmitGlobalTime = DISABLE;
 
-  TxHeader_CubeSat.StdId = 0b00000000000;
-  TxHeader_CubeSat.ExtId = 0x00;
-  TxHeader_CubeSat.RTR = CAN_RTR_DATA;
-  TxHeader_CubeSat.IDE = CAN_ID_STD;
-  TxHeader_CubeSat.DLC = 1; // Data length is equal to 1
-  TxHeader_CubeSat.TransmitGlobalTime = DISABLE;
+  TxHeader.StdId = 0b00000000000;
+  TxHeader.ExtId = 0x00;
+  TxHeader.RTR = CAN_RTR_DATA;
+  TxHeader.IDE = CAN_ID_STD;
+  TxHeader.DLC = 1; // Data length is equal to 1
+  TxHeader.TransmitGlobalTime = DISABLE;
 
   /* USER CODE END CAN1_Init 2 */
 
@@ -521,7 +519,7 @@ void Read_FLASH_and_Prepare_Data_for_CAN(uint32_t Sector, uint32_t StartSectorAd
         }
 
         /* Now that we have 8 bytes of data, we send a message through the CAN bus! */
-        if (HAL_CAN_AddTxMessage(&hcan1 , &TxHeader_GroundStation, TxData, &TxMailbox) != HAL_OK) {
+        if (HAL_CAN_AddTxMessage(&hcan1 , &TxHeader, TxData, &TxMailbox) != HAL_OK) {
            // printf("Error sending CAN message\r\n");
         } else {
             printf("CAN message sent successfully\r\n");
@@ -538,34 +536,7 @@ void Read_FLASH_and_Prepare_Data_for_CAN(uint32_t Sector, uint32_t StartSectorAd
 
 
 
-/* When a message is received, we need to read it and write it in the Flash memory of the receiving board. */
 
-
-
-
-
-//void sendACK(){
-//
-//	TxData[0] = 0x11;
-//	HAL_CAN_AddTxMessage(&hcan1 , &TxHeader_CubeSat, TxData, &TxMailbox);
-//}FLASH_USER_END_ADDR_RX
-//
-//enum ACK_status receiveACK(){
-//
-//	if (HAL_CAN_GetRxMessage(&hcan1, CAN_RX_FIFO0, &RxHeader_GroundStation, RxData) != HAL_OK){
-//		/* Reception Error */
-//		Error_Handler();
-//	}
-//
-//	if ((RxHeader_GroundStation.DLC == 1) && RxData[0] == 0x11){
-//		printf("ACK \r\n");
-//		ack_status = ACK;
-//	}
-//	else {
-//		ack_status = NACK;
-//	}
-//	return ack_status;
-//}
 
 /**
   * @brief  Gets the sector of a given address
