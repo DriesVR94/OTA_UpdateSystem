@@ -37,12 +37,11 @@
 
 #define MAJOR 0
 #define MINOR 0
-/* Before transmitting, we will program the update in Sector 7 ( = last sector) of one of the F446 boards.
- * Programming a .bin file in the Flash memory is done through the STM32CubeProgrammer application.
- * This update will then be send to the second F446 board through the CAN bus. Here, we use wires to simulate this process.
- * For a real space application, a wireless CAN transceiver has to be used.
- * The receiving board will also store the update in sector 7. The sector choice is just an arbitrary decision.
- * Any other sector can be chosen too, as long as it doesn't conflict with firmware code. */
+
+/* Before transmitting, make sure that there is an 'update' available in the sector defined below.
+ * This update will then be sent from one F446 board to another through the CAN bus.
+ * One board simulates the telemetry module (= responsible from communication with the ground station) on a CubeSat,
+ * the other board simulates the on-board computer (OBC) of the CubeSat. */
 
 #define FLASH_USER_START_ADDR_TX   ADDR_FLASH_SECTOR_5_START		/* Start @ of user Flash area */
 #define FLASH_USER_START_ADDR_RX   ADDR_FLASH_SECTOR_5_START
@@ -154,8 +153,6 @@ uint32_t GetSector(uint32_t Address);
 uint32_t GetSectorSize(uint32_t Sector);
 void Read_FLASH_and_Prepare_Data_for_CAN(uint32_t Sector, uint32_t StartSectorAddress);
 uint32_t Read_Message_and_Write_in_FLASH(uint32_t StartSectorAddress, uint32_t EndSectorAddress, uint8_t *data, uint8_t length);
-//static void sendACK(void);
-//static enum ACK_status receiveACK(void);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -534,10 +531,6 @@ void Read_FLASH_and_Prepare_Data_for_CAN(uint32_t Sector, uint32_t StartSectorAd
 }
 
 
-
-
-
-
 /**
   * @brief  Gets the sector of a given address
   * @param  None
@@ -793,8 +786,6 @@ void CANRxTask(void *argument)
 
     }
 }
-
-
 
 
 
