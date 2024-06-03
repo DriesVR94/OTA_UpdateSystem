@@ -1,0 +1,3 @@
+Here is the Core Code for creating Tasks as Functions
+
+Instead of defining the tasks in another file, we just call a function inside the tasks, and this function is defined in a file that we can allocate in a place in memory and read from there.
