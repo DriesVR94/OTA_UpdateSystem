@@ -63,7 +63,6 @@ QueueHandle_t canRxQueue;
 
 /* Private variables ---------------------------------------------------------*/
 CAN_HandleTypeDef hcan1;
-
 UART_HandleTypeDef huart3;
 
 /* Definitions for app0 */
@@ -134,11 +133,10 @@ void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_USART3_UART_Init(void);
 static void MX_CAN1_Init(void);
-void StartApp0(void *argument);
+void ShowBoardStatus(void *argument);
 void StartApp1(void *argument);
 void StartApp2(void *argument);
 void StartApp3(void *argument);
-
 void StartApp1_1(void *argument);
 
 /* USER CODE BEGIN PFP */
@@ -234,7 +232,7 @@ int main(void)
 
   /* Create the thread(s) */
   /* creation of app0 */
-  app0Handle = osThreadNew(StartApp0, NULL, &app0_attributes);
+  app0Handle = osThreadNew(ShowBoardStatus, NULL, &app0_attributes);
 
   /* creation of app1 */
   app1Handle = osThreadNew(StartApp1, NULL, &app1_attributes);
@@ -685,7 +683,7 @@ uint32_t Read_Message_and_Write_in_FLASH(uint32_t Address, uint32_t EndSectorAdd
         }
     }
 
-    printf("Flash write successful: At address %lu\r\n", Address);
+    printf("Address %lu\r\n", Address);
     HAL_FLASH_Lock();
     //printf("Flash locked\r\n");
 
@@ -720,11 +718,11 @@ void CANRxTask(void *argument)
         {
             // Process the received message
             //printf("Received CAN message with ID: 0x%03lX\r\n", (unsigned long)pRxHeader->StdId);
-            for (int i = 0; i < pRxHeader->DLC; i++)
-            {
-                printf("%02X ", pRxData[i]);
-            }
-            printf("\r\n");
+//            for (int i = 0; i < pRxHeader->DLC; i++)
+//            {
+//                printf("%02X ", pRxData[i]);
+//            }
+//            printf("\r\n");
 
             // Erase the sector only once before writing the data
             if (!flashErased)
@@ -778,9 +776,6 @@ void CANRxTask(void *argument)
             //osDelay(3000);    //Safety delay for launching it
 
 //            printf("Cerating a new task \r\n");
-//
-//
-//
 //            osThreadNew(StartApp1_1, NULL, &app1_1_attributes);
 
 
@@ -823,55 +818,34 @@ void StartApp1_1(void *argument)
 
 /* USER CODE END 4 */
 
-/* USER CODE BEGIN Header_StartApp0 */
+/* USER CODE BEGIN Header_ShowBoardStatus */
 /**
   * @brief  Function implementing the app0 thread.
   * @param  argument: Not used
   * @retval None
   */
-/* USER CODE END Header_StartApp0 */
-void StartApp0(void *argument)
+/* USER CODE END Header_ShowBoardStatus */
+void ShowBoardStatus(void *argument)
 {
   /* USER CODE BEGIN 5 */
   /* Infinite loop */
   for(;;)
   {
-	  if (TX){
-		  if (board_status == NO_UPDATE_AVAILABLE){
-			  HAL_GPIO_WritePin(GPIOB, LD2_Pin | LD1_Pin, GPIO_PIN_RESET);
-			  HAL_GPIO_TogglePin(GPIOB, LD3_Pin);
-			  osDelay(1000);
-		  }
-		  else if (board_status == SENDING_UPDATE){
-			  HAL_GPIO_WritePin(GPIOB, LD3_Pin | LD1_Pin, GPIO_PIN_RESET);
-			  HAL_GPIO_TogglePin(GPIOB, LD2_Pin);
-			  osDelay(100);
-		  }
-		  else if (board_status == UPDATE_FINISHED){
-			  HAL_GPIO_WritePin(GPIOB, LD2_Pin | LD3_Pin, GPIO_PIN_RESET);
-			  HAL_GPIO_TogglePin(GPIOB, LD1_Pin);
-			  printf("update finished");
-			  osDelay(1000);
-		  }
+	  osDelay(100);
+	  if (board_status == NO_UPDATE_AVAILABLE){
+		  HAL_GPIO_WritePin(GPIOB, LD2_Pin | LD1_Pin, GPIO_PIN_RESET);
+		  HAL_GPIO_TogglePin(GPIOB, LD3_Pin);
+		  osDelay(1000);
 	  }
-
-	  else {
+	  else if (board_status == RECEIVING_UPDATE){
+		  HAL_GPIO_WritePin(GPIOB, LD3_Pin | LD1_Pin, GPIO_PIN_RESET);
+		  HAL_GPIO_TogglePin(GPIOB, LD2_Pin);
 		  osDelay(100);
-		  if (board_status == NO_UPDATE_AVAILABLE){
-			  HAL_GPIO_WritePin(GPIOB, LD2_Pin | LD1_Pin, GPIO_PIN_RESET);
-			  HAL_GPIO_TogglePin(GPIOB, LD3_Pin);
-			  osDelay(1000);
-		  }
-		  else if (board_status == RECEIVING_UPDATE){
-			  HAL_GPIO_WritePin(GPIOB, LD3_Pin | LD1_Pin, GPIO_PIN_RESET);
-			  HAL_GPIO_TogglePin(GPIOB, LD2_Pin);
-			  osDelay(100);
-		  }
-		  else if (board_status == UPDATE_FINISHED){
-			  HAL_GPIO_WritePin(GPIOB, LD2_Pin | LD3_Pin, GPIO_PIN_RESET);
-			  HAL_GPIO_TogglePin(GPIOB, LD1_Pin);
-			  osDelay(1000);
-		  }
+	  }
+	  else if (board_status == UPDATE_FINISHED){
+		  HAL_GPIO_WritePin(GPIOB, LD2_Pin | LD3_Pin, GPIO_PIN_RESET);
+		  HAL_GPIO_TogglePin(GPIOB, LD1_Pin);
+		  osDelay(1000);
 	  }
 	  osDelay(1);
   }
