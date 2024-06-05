@@ -56,7 +56,6 @@ UART_HandleTypeDef huart3;
 
 // CAN variables
 CAN_TxHeaderTypeDef   	TxHeader;
-CAN_RxHeaderTypeDef   	RxHeader;
 uint8_t               	TxData[8];
 uint8_t               	RxData[8];
 uint8_t 				TxBuffer;
