@@ -56,7 +56,6 @@
 
 /* Private variables ---------------------------------------------------------*/
 CAN_HandleTypeDef hcan1;
-
 UART_HandleTypeDef huart3;
 
 /* USER CODE BEGIN PV */
@@ -74,8 +73,6 @@ uint8_t               	RxData[8];
 uint32_t              	TxMailbox;
 enum board_status 	  	{NO_UPDATE_AVAILABLE, SENDING_UPDATE, RECEIVING_UPDATE, UPDATE_FINISHED};
 enum board_status 	  	board_status = NO_UPDATE_AVAILABLE;
-enum ACK_status		  	{ACK, NACK};
-enum ACK_status			ack_status = NACK;
 
 // Flash Operation variables
 uint32_t FirstSector = 0, NbOfSectors = 0;
@@ -97,8 +94,7 @@ static void MX_CAN1_Init(void);
 static uint32_t GetSectorSize(uint32_t Sector);
 static void Read_FLASH_and_Prepare_Data_for_CAN(uint32_t Sector, uint32_t StartSectorAddress);
 static uint32_t Read_Message_and_Write_in_FLASH(uint32_t StartSectorAddress, uint32_t EndSectorAddress);
-//static void sendACK(void);
-//static enum ACK_status receiveACK(void);
+
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -113,11 +109,6 @@ static uint32_t Read_Message_and_Write_in_FLASH(uint32_t StartSectorAddress, uin
 int main(void)
 {
   /* USER CODE BEGIN 1 */
-
-	/* Transmitting board: 	TX = 1
-	 * Receiving board: 	TX = 0 */
-
-	TX = 1;
 
   /* USER CODE END 1 */
 
@@ -386,8 +377,6 @@ void Read_FLASH_and_Prepare_Data_for_CAN(uint32_t Sector, uint32_t StartSectorAd
 	/* Since sectors can have different length, we need to calculate how many bytes need to be read. */
 	uint32_t nrOfBytes = GetSectorSize(Sector);
 
-	//uint32_t sector = Sector;
-
  	while (nrOfBytes != 0){
  		HAL_GPIO_TogglePin(GPIOB, LD2_Pin);
  		for (int i = 0; i < 8; i++){
@@ -402,7 +391,6 @@ void Read_FLASH_and_Prepare_Data_for_CAN(uint32_t Sector, uint32_t StartSectorAd
 
  			/* Decrement the number of bytes that still have to be read. */
  			nrOfBytes--;
- 			//printf("Sector: %lu \r\n", sector);
  			printf("nrOfBytes: %lu \r\n", nrOfBytes);
  			printf("TxData: %02X \r\n", TxData[i]);
  		}
@@ -420,18 +408,8 @@ void Read_FLASH_and_Prepare_Data_for_CAN(uint32_t Sector, uint32_t StartSectorAd
 uint32_t Read_Message_and_Write_in_FLASH(uint32_t StartSectorAddress, uint32_t EndSectorAddress){
 
 	printf("reading message \r\n");
-
 	HAL_FLASH_Unlock();
-
 	board_status = RECEIVING_UPDATE;
-
-//	/* Get RX message */
-//	if (HAL_CAN_GetRxMessage(&hcan1, CAN_RX_FIFO0, &RxHeader, RxData) != HAL_OK)
-//	{
-//		/* Reception Error */
-//	    Error_Handler();
-//	}
-
 
 	/* Program the user Flash area byte by byte. */
 	Address = StartSectorAddress;
@@ -453,7 +431,6 @@ uint32_t Read_Message_and_Write_in_FLASH(uint32_t StartSectorAddress, uint32_t E
 				//printf("RxData: %02X \r\n", RxData[i]);
 			}
 		}
-		//sendACK();
 	}
 
 	 /* Lock the Flash to disable the flash control register access
@@ -463,28 +440,6 @@ uint32_t Read_Message_and_Write_in_FLASH(uint32_t StartSectorAddress, uint32_t E
 	return Address;
 }
 
-//void sendACK(){
-//
-//	TxData[0] = 0x11;
-//	HAL_CAN_AddTxMessage(&hcan1 , &TxHeader_CubeSat, TxData, &TxMailbox);
-//}
-//
-//enum ACK_status receiveACK(){
-//
-//	if (HAL_CAN_GetRxMessage(&hcan1, CAN_RX_FIFO0, &RxHeader_GroundStation, RxData) != HAL_OK){
-//		/* Reception Error */
-//		Error_Handler();
-//	}
-//
-//	if ((RxHeader_GroundStation.DLC == 1) && RxData[0] == 0x11){
-//		printf("ACK \r\n");
-//		ack_status = ACK;
-//	}
-//	else {
-//		ack_status = NACK;
-//	}
-//	return ack_status;
-//}
 
 /**
   * @brief  Gets sector Size
@@ -517,34 +472,10 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){
 	}
 }
 
-//void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan)
-//{
-//  /* Get RX message */
-//  if (HAL_CAN_GetRxMessage(hcan, CAN_RX_FIFO0, &RxHeader, RxData) != HAL_OK)
-//  {
-//    /* Reception Error */
-//    Error_Handler();
-//  }
-//
-//  /* Display LEDx */
-//  if ((RxHeader.StdId == 0b00000000000) && (RxHeader.IDE == CAN_ID_STD) && (RxHeader.DLC == 8))
-//  {
-//    printf("message received \r\n");
-//  }
-//}
-
 void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan)
 {
-//	if (TX){
-//		printf("in the transmitter's callback \r\n");
-//		receiveACK();
-
-//	}
-//	else {
-		printf("in the receiver's callback \r\n");
-		Read_Message_and_Write_in_FLASH(Address, FLASH_USER_END_ADDR_RX);
-//	}
-
+	printf("in the receiver's callback \r\n");
+	Read_Message_and_Write_in_FLASH(Address, FLASH_USER_END_ADDR_RX);
 }
 
 
