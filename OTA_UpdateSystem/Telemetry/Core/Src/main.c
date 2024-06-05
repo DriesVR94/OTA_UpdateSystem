@@ -23,7 +23,6 @@
 /* USER CODE BEGIN Includes */
 #include <stdio.h>
 #include "F446ZE_FLASH_Sector_Addresses.h"
-#include "applications.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -34,12 +33,10 @@
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 
-/* Before transmitting, we will program the update in Sector 7 ( = its last sector) of one of the F446 boards.
- * Programming a .bin file in the Flash memory is done through the STM32CubeProgrammer application.
- * This update will then be send to the second F446 board through the CAN bus. Here, we use wires to simulate this process.
- * For a real space application, a wireless CAN transceiver has to be used.
- * The receiving board will also store the update in sector 7. The sector choice is just an arbitrary decision.
- * Any other sector can be chosen too, as long as it doesn't conflict with firmware code. */
+/* Before transmitting, make sure that there is an 'update' available in the sector defined below.
+ * This update will then be sent from one F446 board to another through the CAN bus.
+ * One board simulates the telemetry module (= responsible from communication with the ground station) on a CubeSat,
+ * the other board simulates the on-board computer (OBC) of the CubeSat. */
 
 #define FLASH_USER_START_ADDR_TX   ADDR_FLASH_SECTOR_7_START		/* Start @ of user Flash area */
 #define FLASH_USER_END_ADDR_TX     ADDR_FLASH_SECTOR_7_END 			/* End @ of user Flash area */
@@ -64,10 +61,11 @@ uint8_t               	TxData[8];
 uint8_t               	RxData[8];
 uint8_t 				TxBuffer;
 uint32_t              	TxMailbox;
-enum board_status 	  	{NO_UPDATE_AVAILABLE, SENDING_UPDATE, RECEIVING_UPDATE, UPDATE_FINISHED};
-enum board_status 	  	board_status = NO_UPDATE_AVAILABLE;
 
-/*Variable used for Flash Erase procedure*/
+// Board status variables
+enum board_status 	  	{READY_FOR_UPDATE, SENDING_UPDATE, RECEIVING_UPDATE, UPDATE_FINISHED};
+enum board_status 	  	board_status = READY_FOR_UPDATE;
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -130,19 +128,21 @@ int main(void)
 
     /* USER CODE BEGIN 3 */
 
-	  if (board_status == NO_UPDATE_AVAILABLE){
+	  /* Depending on the state of the board, an LED will blink */
+
+	  if (board_status == READY_FOR_UPDATE){
 		  HAL_GPIO_WritePin(GPIOB, LD2_Pin | LD1_Pin, GPIO_PIN_RESET);
-		  HAL_GPIO_TogglePin(GPIOB, LD3_Pin);
+		  HAL_GPIO_TogglePin(GPIOB, LD3_Pin);   						// Red LED will blink
 		  HAL_Delay(1000);
 	  }
 	  else if (board_status == SENDING_UPDATE){
 		  HAL_GPIO_WritePin(GPIOB, LD3_Pin | LD1_Pin, GPIO_PIN_RESET);
-		  HAL_GPIO_TogglePin(GPIOB, LD2_Pin);
+		  HAL_GPIO_TogglePin(GPIOB, LD2_Pin); 							// Blue LED will blink
 		  HAL_Delay(100);
 	  }
 	  else if (board_status == UPDATE_FINISHED){
 		  HAL_GPIO_WritePin(GPIOB, LD2_Pin | LD3_Pin, GPIO_PIN_RESET);
-		  HAL_GPIO_TogglePin(GPIOB, LD1_Pin);
+		  HAL_GPIO_TogglePin(GPIOB, LD1_Pin);							// Green LED will blink
 		  HAL_Delay(1000);
 	  }
   }
