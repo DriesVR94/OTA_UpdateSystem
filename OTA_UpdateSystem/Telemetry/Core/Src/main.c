@@ -42,11 +42,8 @@
  * Any other sector can be chosen too, as long as it doesn't conflict with firmware code. */
 
 #define FLASH_USER_START_ADDR_TX   ADDR_FLASH_SECTOR_7_START		/* Start @ of user Flash area */
-#define FLASH_USER_START_ADDR_RX   ADDR_FLASH_SECTOR_7_START
 #define FLASH_USER_END_ADDR_TX     ADDR_FLASH_SECTOR_7_END 			/* End @ of user Flash area */
-#define FLASH_USER_END_ADDR_RX	   ADDR_FLASH_SECTOR_7_END
 
-#define DATA_32                    ((uint32_t)0x12345678)
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -60,25 +57,15 @@ UART_HandleTypeDef huart3;
 
 /* USER CODE BEGIN PV */
 
-// Define whether the board will be sending or receiving.
-uint8_t			      	TX;
-
 // CAN variables
-CAN_TxHeaderTypeDef   	TxHeader_GroundStation;
-CAN_TxHeaderTypeDef   	TxHeader_CubeSat;
-CAN_RxHeaderTypeDef   	RxHeader_GroundStation;
-CAN_RxHeaderTypeDef   	RxHeader_CubeSat;
+CAN_TxHeaderTypeDef   	TxHeader;
+CAN_RxHeaderTypeDef   	RxHeader;
 uint8_t               	TxData[8];
 uint8_t               	RxData[8];
+uint8_t 				TxBuffer;
 uint32_t              	TxMailbox;
 enum board_status 	  	{NO_UPDATE_AVAILABLE, SENDING_UPDATE, RECEIVING_UPDATE, UPDATE_FINISHED};
 enum board_status 	  	board_status = NO_UPDATE_AVAILABLE;
-
-// Flash Operation variables
-uint32_t FirstSector = 0, NbOfSectors = 0;
-uint32_t Address = FLASH_USER_START_ADDR_RX, SECTORError = 0;
-__IO uint32_t data32 = 0 , MemoryProgramStatus = 0;
-uint8_t TxBuffer;
 
 /*Variable used for Flash Erase procedure*/
 /* USER CODE END PV */
@@ -93,7 +80,6 @@ static void MX_CAN1_Init(void);
 /* Function prototypes for Flash Operations */
 static uint32_t GetSectorSize(uint32_t Sector);
 static void Read_FLASH_and_Prepare_Data_for_CAN(uint32_t Sector, uint32_t StartSectorAddress);
-static uint32_t Read_Message_and_Write_in_FLASH(uint32_t StartSectorAddress, uint32_t EndSectorAddress);
 
 /* USER CODE END PFP */
 
@@ -269,19 +255,12 @@ static void MX_CAN1_Init(void)
       Error_Handler();
     }
 
-  TxHeader_GroundStation.StdId = 0b00000000000;
-  TxHeader_GroundStation.ExtId = 0x00;
-  TxHeader_GroundStation.RTR = CAN_RTR_DATA;
-  TxHeader_GroundStation.IDE = CAN_ID_STD;
-  TxHeader_GroundStation.DLC = 8; // Data length is equal to 8
-  TxHeader_GroundStation.TransmitGlobalTime = DISABLE;
-
-  TxHeader_CubeSat.StdId = 0b00000000000;
-  TxHeader_CubeSat.ExtId = 0x00;
-  TxHeader_CubeSat.RTR = CAN_RTR_DATA;
-  TxHeader_CubeSat.IDE = CAN_ID_STD;
-  TxHeader_CubeSat.DLC = 1; // Data length is equal to 1
-  TxHeader_CubeSat.TransmitGlobalTime = DISABLE;
+  TxHeader.StdId = 0b00000000000;
+  TxHeader.ExtId = 0x00;
+  TxHeader.RTR = CAN_RTR_DATA;
+  TxHeader.IDE = CAN_ID_STD;
+  TxHeader.DLC = 8; // Data length is equal to 8
+  TxHeader.TransmitGlobalTime = DISABLE;
 
   /* USER CODE END CAN1_Init 2 */
 
@@ -396,48 +375,12 @@ void Read_FLASH_and_Prepare_Data_for_CAN(uint32_t Sector, uint32_t StartSectorAd
  		}
 
  		/* Now that we have 8 bytes of data, we send a message through the CAN bus! */
- 		HAL_CAN_AddTxMessage(&hcan1 , &TxHeader_GroundStation, TxData, &TxMailbox);
+ 		HAL_CAN_AddTxMessage(&hcan1 , &TxHeader, TxData, &TxMailbox);
 	}
 
  	/* When all data is read and sent, we lock the Flash memory again to protect it from unwanted operations. */
  	HAL_FLASH_Lock();
  	board_status = UPDATE_FINISHED;
-}
-
-/* When a message is received, we need to read it and write it in the Flash memory of the receiving board. */
-uint32_t Read_Message_and_Write_in_FLASH(uint32_t StartSectorAddress, uint32_t EndSectorAddress){
-
-	printf("reading message \r\n");
-	HAL_FLASH_Unlock();
-	board_status = RECEIVING_UPDATE;
-
-	/* Program the user Flash area byte by byte. */
-	Address = StartSectorAddress;
-	if (Address < EndSectorAddress){
-
-		HAL_GPIO_TogglePin(GPIOB, LD2_Pin);
-
-		/* Get RX message */
-		if (HAL_CAN_GetRxMessage(&hcan1, CAN_RX_FIFO0, &RxHeader_CubeSat, RxData) != HAL_OK){
-
-			/* Reception Error */
-			Error_Handler();
-		}
-
-		for (int i = 0; i < 8; i++){
-			if (HAL_FLASH_Program(FLASH_TYPEPROGRAM_BYTE, Address, RxData[i]) == HAL_OK){
-				//Address = Address + 4;
-				Address++;
-				//printf("RxData: %02X \r\n", RxData[i]);
-			}
-		}
-	}
-
-	 /* Lock the Flash to disable the flash control register access
-	  * (recommended to protect the FLASH memory against possible unwanted operation). */
-	HAL_FLASH_Lock();
-	board_status = UPDATE_FINISHED;
-	return Address;
 }
 
 
@@ -470,12 +413,6 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){
 		// Start reading the Flash sector where we stored the .bin file of the update.
 		Read_FLASH_and_Prepare_Data_for_CAN(FLASH_SECTOR_7, FLASH_USER_START_ADDR_TX);
 	}
-}
-
-void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan)
-{
-	printf("in the receiver's callback \r\n");
-	Read_Message_and_Write_in_FLASH(Address, FLASH_USER_END_ADDR_RX);
 }
 
 
