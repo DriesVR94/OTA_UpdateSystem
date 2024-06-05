@@ -8,7 +8,7 @@
 #include <stdio.h>
 
 
-void __attribute__((section(".custom_section1"))) application1 (void)
+void __attribute__((section(".custom_section0"))) application1 (void)
 {
 	printf("in app 1 \r\n");
 }

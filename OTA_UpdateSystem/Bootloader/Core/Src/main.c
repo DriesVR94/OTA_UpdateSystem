@@ -232,7 +232,7 @@ static void goto_application (void)
 {
 	printf("Gonna Jump to Application \n");
 
-	void (*app_reset_handler)(void) = (void*) ( *(volatile uint32_t *)(0x08010000 +4));
+	void (*app_reset_handler)(void) = (void*) ( *(volatile uint32_t *)(0x08060000 +4));
 
 	HAL_GPIO_WritePin( GPIOB, GPIO_PIN_0, GPIO_PIN_RESET);
 

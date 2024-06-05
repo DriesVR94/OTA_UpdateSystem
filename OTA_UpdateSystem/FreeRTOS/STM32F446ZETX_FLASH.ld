@@ -45,14 +45,17 @@ _Min_Stack_Size = 0x400; /* required amount of stack */
 MEMORY
 {
   RAM    (xrw)    : ORIGIN = 0x20000000,   LENGTH = 128K
-  FLASH    (rx)    : ORIGIN = 0x08010000 , LENGTH = 448K
+  FLASH    (rx)    : ORIGIN = 0x08060000 , LENGTH = 128K	/* All FreeRTOS-related code is stored in sector 7 of the flash memory.*/
   SPI_FLASH (r)    : ORIGIN = 0x90000000,  LENGTH = 8M 
   
   
   /* Custom applications */
-  APPLICATION_1		(rx)	: ORIGIN = 0x8020000,		LENGTH = 64K
-  APPLICATION_2		(rx)	: ORIGIN = 0x8040000,		LENGTH = 128K	
-  APPLICATION_3		(rx)	: ORIGIN = 0x8060000,		LENGTH = 128K
+  /* We reserved flash sectors 0 and 1 for the bootloader. */
+  CUSTOM_SECTION_0 	(rx)	: ORIGIN = 0x08008000,		LENGTH = 16K	/* Flash sector 2 */
+  CUSTOM_SECTION_1 	(rx)	: ORIGIN = 0x0800C000,		LENGTH = 16K	/* Flash sector 3 */
+  CUSTOM_SECTION_2 	(rx)	: ORIGIN = 0x08010000,		LENGTH = 64K	/* Flash sector 4 */
+  CUSTOM_SECTION_3	(rx)	: ORIGIN = 0x08020000,		LENGTH = 128K	/* Flash sector 5 */
+  CUSTOM_SECTION_4	(rx)	: ORIGIN = 0x08040000,		LENGTH = 128K	/* Flash sector 6 */
   
 }
 
@@ -61,20 +64,30 @@ SECTIONS
 {
 
   /* Custom section for applications */
+  .custom_section0 :
+  {
+    *(.custom_section0)
+  } > CUSTOM_SECTION_0
+
   .custom_section1 :
   {
     *(.custom_section1)
-  } > APPLICATION_1
-
+  } > CUSTOM_SECTION_1
+	
   .custom_section2 :
   {
     *(.custom_section2)
-  } > APPLICATION_2
-	
+  } > CUSTOM_SECTION_2
+  
   .custom_section3 :
   {
     *(.custom_section3)
-  } > APPLICATION_3
+  } > CUSTOM_SECTION_3
+  
+  .custom_section4 :
+  {
+    *(.custom_section4)
+  } > CUSTOM_SECTION_4
 	
   /* The startup code into "FLASH" Rom type memory */
   .isr_vector :

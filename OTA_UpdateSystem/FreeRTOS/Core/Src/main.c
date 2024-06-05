@@ -657,14 +657,14 @@ int fputc(int ch, FILE *f)
 
 uint32_t Read_Message_and_Write_in_FLASH(uint32_t Address, uint32_t EndSectorAddress, uint8_t *data, uint8_t length)
 {
-    printf("Entering Read_Message_and_Write_in_FLASH\r\n");
+    //printf("Entering Read_Message_and_Write_in_FLASH\r\n");
     HAL_FLASH_Unlock();
-    printf("Flash unlocked\r\n");
+    //printf("Flash unlocked\r\n");
     board_status = RECEIVING_UPDATE;
 
     for (uint8_t i = 0; i < length; i++)
     {
-        if (Address >= EndSectorAddress)
+        if (Address > EndSectorAddress)
         {
             // Handle error: Flash address out of range
             printf("Flash address out of range\r\n");
@@ -674,7 +674,7 @@ uint32_t Read_Message_and_Write_in_FLASH(uint32_t Address, uint32_t EndSectorAdd
         HAL_StatusTypeDef flash_status = HAL_FLASH_Program(FLASH_TYPEPROGRAM_BYTE, Address, data[i]);
         if (flash_status == HAL_OK)
         {
-            printf("Flash write successful: %02X at address %lu\r\n", data[i], Address);
+            //printf("Flash write successful: %02X at address %lu\r\n", data[i], Address);
             Address++;
         }
         else
@@ -685,10 +685,11 @@ uint32_t Read_Message_and_Write_in_FLASH(uint32_t Address, uint32_t EndSectorAdd
         }
     }
 
+    printf("Flash write successful: At address %lu\r\n", Address);
     HAL_FLASH_Lock();
-    printf("Flash locked\r\n");
+    //printf("Flash locked\r\n");
 
-    printf("Exiting Read_Message_and_Write_in_FLASH\r\n");
+    //printf("Exiting Read_Message_and_Write_in_FLASH\r\n");
     return Address;
 }
 
@@ -702,6 +703,8 @@ void CANRxTask(void *argument)
     uint8_t buffer[sizeof(CAN_RxHeaderTypeDef) + sizeof(uint8_t[8])];
     CAN_RxHeaderTypeDef *pRxHeader = (CAN_RxHeaderTypeDef *)buffer;
     uint8_t *pRxData = buffer + sizeof(CAN_RxHeaderTypeDef);
+    uint32_t sector = GetSector(FLASH_USER_START_ADDR_RX);
+    uint32_t sectorsize = GetSectorSize(sector);
 
     // Declare the app1_1_attributes at the beginning of the function
     osThreadAttr_t app1_1_attributes = {
@@ -716,7 +719,7 @@ void CANRxTask(void *argument)
         if (xQueueReceive(canRxQueue, buffer, portMAX_DELAY) == pdPASS)
         {
             // Process the received message
-            printf("Received CAN message with ID: 0x%03lX\r\n", (unsigned long)pRxHeader->StdId);
+            //printf("Received CAN message with ID: 0x%03lX\r\n", (unsigned long)pRxHeader->StdId);
             for (int i = 0; i < pRxHeader->DLC; i++)
             {
                 printf("%02X ", pRxData[i]);
@@ -761,7 +764,7 @@ void CANRxTask(void *argument)
 
 
             // Set the update complete flag when the last chunk is received and written
-            if (Address >= 0x8020056)
+            if (Address == FLASH_USER_START_ADDR_RX + sectorsize)
             {
                 updateComplete = true;
 
@@ -786,7 +789,6 @@ void CANRxTask(void *argument)
 
     }
 }
-
 
 
 // Function to trigger a system reset

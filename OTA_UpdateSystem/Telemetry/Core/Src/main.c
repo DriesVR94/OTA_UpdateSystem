@@ -41,10 +41,10 @@
  * The receiving board will also store the update in sector 7. The sector choice is just an arbitrary decision.
  * Any other sector can be chosen too, as long as it doesn't conflict with firmware code. */
 
-#define FLASH_USER_START_ADDR_TX   ADDR_FLASH_SECTOR_5_START		/* Start @ of user Flash area */
-#define FLASH_USER_START_ADDR_RX   ADDR_FLASH_SECTOR_5_START
-#define FLASH_USER_END_ADDR_TX     ADDR_FLASH_SECTOR_5_END 			/* End @ of user Flash area */
-#define FLASH_USER_END_ADDR_RX	   ADDR_FLASH_SECTOR_5_END
+#define FLASH_USER_START_ADDR_TX   ADDR_FLASH_SECTOR_7_START		/* Start @ of user Flash area */
+#define FLASH_USER_START_ADDR_RX   ADDR_FLASH_SECTOR_7_START
+#define FLASH_USER_END_ADDR_TX     ADDR_FLASH_SECTOR_7_END 			/* End @ of user Flash area */
+#define FLASH_USER_END_ADDR_RX	   ADDR_FLASH_SECTOR_7_END
 
 #define DATA_32                    ((uint32_t)0x12345678)
 /* USER CODE END PD */
@@ -191,9 +191,7 @@ int main(void)
     }
 
   /* Start the CAN and enable interrupts*/
-  //HAL_CAN_Start(&hcan1);
 
-  application1();
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -464,8 +462,8 @@ void Read_FLASH_and_Prepare_Data_for_CAN(uint32_t Sector, uint32_t StartSectorAd
 	/* Unlock the Flash to enable the flash control register access. */
 	HAL_FLASH_Unlock();
 	/* Since sectors can have different length, we need to calculate how many bytes need to be read. */
-	//uint32_t nrOfBytes = GetSectorSize(Sector);
-	uint32_t nrOfBytes =56;
+	uint32_t nrOfBytes = GetSectorSize(Sector);
+
 	//uint32_t sector = Sector;
 
  	while (nrOfBytes != 0){
@@ -637,7 +635,7 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){
 	if (GPIO_Pin == GPIO_PIN_13){
 
 		// Start reading the Flash sector where we stored the .bin file of the update.
-		Read_FLASH_and_Prepare_Data_for_CAN(FLASH_SECTOR_3, FLASH_USER_START_ADDR_TX);
+		Read_FLASH_and_Prepare_Data_for_CAN(FLASH_SECTOR_7, FLASH_USER_START_ADDR_TX);
 	}
 }
 
