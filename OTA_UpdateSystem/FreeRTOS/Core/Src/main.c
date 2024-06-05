@@ -43,10 +43,8 @@
  * One board simulates the telemetry module (= responsible from communication with the ground station) on a CubeSat,
  * the other board simulates the on-board computer (OBC) of the CubeSat. */
 
-#define FLASH_USER_START_ADDR_TX   ADDR_FLASH_SECTOR_5_START		/* Start @ of user Flash area */
-#define FLASH_USER_START_ADDR_RX   ADDR_FLASH_SECTOR_5_START
-#define FLASH_USER_END_ADDR_TX     ADDR_FLASH_SECTOR_5_END 			/* End @ of user Flash area */
-#define FLASH_USER_END_ADDR_RX	   ADDR_FLASH_SECTOR_5_END
+#define FLASH_USER_START_ADDR_RX   ADDR_FLASH_SECTOR_5_START		/* Start @ of user Flash area */
+#define FLASH_USER_END_ADDR_RX     ADDR_FLASH_SECTOR_5_END 			/* End @ of user Flash area */
 
 #define APPLICATION_START_ADDR      0x8000000
 
@@ -56,8 +54,7 @@
 /* Private macro -------------------------------------------------------------*/
 /* USER CODE BEGIN PM */
 
-//Queue for CAN Bus
-QueueHandle_t canRxQueue;
+
 
 /* USER CODE END PM */
 
@@ -97,19 +94,17 @@ const osThreadAttr_t app3_attributes = {
 
 
 const uint8_t			APP_Version[2]={MAJOR, MINOR};
-// Define whether the board will be sending or receiving.
-uint8_t			      	TX;
 
 // CAN variables
-CAN_TxHeaderTypeDef   	TxHeader;
 CAN_RxHeaderTypeDef   	RxHeader;
 uint8_t               	TxData[8];
 uint8_t               	RxData[8];
 uint32_t              	TxMailbox;
+QueueHandle_t canRxQueue;
+
+// Board status variables
 enum board_status 	  	{NO_UPDATE_AVAILABLE, SENDING_UPDATE, RECEIVING_UPDATE, UPDATE_FINISHED};
 enum board_status 	  	board_status = NO_UPDATE_AVAILABLE;
-enum ACK_status		  	{ACK, NACK};
-enum ACK_status			ack_status = NACK;
 
 // Flash Operation variables
 uint32_t FirstSector = 0, NbOfSectors = 0;
@@ -149,7 +144,6 @@ void RebootToApplication(void);
 /* Function prototypes for Flash Operations */
 uint32_t GetSector(uint32_t Address);
 uint32_t GetSectorSize(uint32_t Sector);
-void Read_FLASH_and_Prepare_Data_for_CAN(uint32_t Sector, uint32_t StartSectorAddress);
 uint32_t Read_Message_and_Write_in_FLASH(uint32_t StartSectorAddress, uint32_t EndSectorAddress, uint8_t *data, uint8_t length);
 /* USER CODE END PFP */
 
@@ -166,11 +160,6 @@ uint32_t Read_Message_and_Write_in_FLASH(uint32_t StartSectorAddress, uint32_t E
 int main(void)
 {
   /* USER CODE BEGIN 1 */
-
-	/* Transmitting board: 	TX = 1
-	 * Receiving board: 	TX = 0 */
-	// MODIFY TX value
-	TX = 0;
 
   /* USER CODE END 1 */
 
@@ -385,20 +374,6 @@ static void MX_CAN1_Init(void)
       Error_Handler();
     }
 
-  TxHeader.StdId = 0b00000000000;
-  TxHeader.ExtId = 0x00;
-  TxHeader.RTR = CAN_RTR_DATA;
-  TxHeader.IDE = CAN_ID_STD;
-  TxHeader.DLC = 8; // Data length is equal to 8
-  TxHeader.TransmitGlobalTime = DISABLE;
-
-  TxHeader.StdId = 0b00000000000;
-  TxHeader.ExtId = 0x00;
-  TxHeader.RTR = CAN_RTR_DATA;
-  TxHeader.IDE = CAN_ID_STD;
-  TxHeader.DLC = 1; // Data length is equal to 1
-  TxHeader.TransmitGlobalTime = DISABLE;
-
   /* USER CODE END CAN1_Init 2 */
 
 }
@@ -479,56 +454,6 @@ static void MX_GPIO_Init(void)
 
 /* USER CODE BEGIN 4 */
 
-
-/* We will read the full sector. We read a byte each time and pass it to the TxData[i] of the CAN.
- * The maximum amount of data the CAN protocol can send per message is 8 bytes,
- * so we will repeat the read operation 8 times. */
-void Read_FLASH_and_Prepare_Data_for_CAN(uint32_t Sector, uint32_t StartSectorAddress){
-    printf("Starting Read_FLASH_and_Prepare_Data_for_CAN\r\n");
-    board_status = SENDING_UPDATE;
-    HAL_GPIO_WritePin(GPIOB, LD3_Pin | LD1_Pin, GPIO_PIN_RESET);
-
-    //osMutexAcquire(mutex_memHandle, osWaitForever);
-    /* Unlock the Flash to enable the flash control register access. */
-    HAL_FLASH_Unlock();
-
-    /* Since sectors can have different length, we need to calculate how many bytes need to be read. */
-    uint32_t nrOfBytes = GetSectorSize(Sector)/8;
-
-    while (nrOfBytes != 0){
-        HAL_GPIO_TogglePin(GPIOB, LD2_Pin);
-        for (int i = 0; i < 8; i++){
-            /* Read the first byte from Flash and store it in TxBuffer. */
-            TxBuffer = *(__IO uint8_t *)StartSectorAddress;
-
-            /* Put the content of TxBuffer in TxData[i]. */
-            TxData[i] = TxBuffer;
-
-            /* Move to the next byte in Flash memory. */
-            StartSectorAddress += sizeof(uint8_t);
-
-            /* Decrement the number of bytes that still have to be read. */
-            nrOfBytes--;
-            printf("nrOfBytes: %lu \r\n", nrOfBytes);
-            printf("TxData[%d]: %02X \r\n", i, TxData[i]);
-        }
-
-        /* Now that we have 8 bytes of data, we send a message through the CAN bus! */
-        if (HAL_CAN_AddTxMessage(&hcan1 , &TxHeader, TxData, &TxMailbox) != HAL_OK) {
-           // printf("Error sending CAN message\r\n");
-        } else {
-            printf("CAN message sent successfully\r\n");
-        }
-    }
-
-    /* When all data is read and sent, we lock the Flash memory again to protect it from unwanted operations. */
-    HAL_FLASH_Lock();
-    board_status = UPDATE_FINISHED;
-    //osMutexRelease(mutex_memHandle);
-    printf("Finished Read_FLASH_and_Prepare_Data_for_CAN\r\n");
-}
-
-
 /**
   * @brief  Gets the sector of a given address
   * @param  None
@@ -596,29 +521,6 @@ uint32_t GetSectorSize(uint32_t Sector)
   return sectorsize;
 }
 
-void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){
-	if (GPIO_Pin == GPIO_PIN_13){
-
-		// Start reading the Flash sector where we stored the .bin file of the update.
-		Read_FLASH_and_Prepare_Data_for_CAN(FLASH_SECTOR_3, FLASH_USER_START_ADDR_TX);
-	}
-}
-
-//void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan)
-//{
-//  /* Get RX message */
-//  if (HAL_CAN_GetRxMessage(hcan, CAN_RX_FIFO0, &RxHeader, RxData) != HAL_OK)
-//  {
-//    /* Reception Error */
-//    Error_Handler();
-//  }
-//
-//  /* Display LEDx */
-//  if ((RxHeader.StdId == 0b00000000000) && (RxHeader.IDE == CAN_ID_STD) && (RxHeader.DLC == 8))
-//  {
-//    printf("message received \r\n");
-//  }
-//}
 
 void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan)
 {
@@ -716,13 +618,6 @@ void CANRxTask(void *argument)
         // Wait for data to be available in the queue
         if (xQueueReceive(canRxQueue, buffer, portMAX_DELAY) == pdPASS)
         {
-            // Process the received message
-            //printf("Received CAN message with ID: 0x%03lX\r\n", (unsigned long)pRxHeader->StdId);
-//            for (int i = 0; i < pRxHeader->DLC; i++)
-//            {
-//                printf("%02X ", pRxData[i]);
-//            }
-//            printf("\r\n");
 
             // Erase the sector only once before writing the data
             if (!flashErased)
