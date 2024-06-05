@@ -84,8 +84,6 @@ __IO uint32_t data32 = 0 , MemoryProgramStatus = 0;
 uint8_t TxBuffer;
 
 /*Variable used for Flash Erase procedure*/
-static FLASH_EraseInitTypeDef EraseInitStruct;
-
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -96,7 +94,6 @@ static void MX_CAN1_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* Function prototypes for Flash Operations */
-static uint32_t GetSector(uint32_t Address);
 static uint32_t GetSectorSize(uint32_t Sector);
 static void Read_FLASH_and_Prepare_Data_for_CAN(uint32_t Sector, uint32_t StartSectorAddress);
 static uint32_t Read_Message_and_Write_in_FLASH(uint32_t StartSectorAddress, uint32_t EndSectorAddress);
@@ -146,52 +143,6 @@ int main(void)
   MX_CAN1_Init();
   /* USER CODE BEGIN 2 */
 
-  /* As mentioned in 'stm32f4xx_hal_can.c', if you want to change any of the callback functions defined in 'stm32f4xx_hal_can.h',
-   * you first need to set the macro 'USE_HAL_CAN_REGISTER_CALLBACKS' to 1 in 'stm32f4xx_hal_conf.h'.
-   * This can also be done in the .ioc file GUI by going to Project Manager > Advanced Settings > Register Callback > CAN: ENABLE
-   * Secondly, you need to register this callback using the function below. */
-  //HAL_CAN_RegisterCallback(&hcan1, HAL_CAN_RX_FIFO0_MSG_PENDING_CB_ID, HAL_CAN_RxFifo0MsgPendingCallback);
-
-  /* Before receiving an update, we need to make sure that the receiving board erases the sector where the update will be stored. */
-  if (!TX){
-
-	  /* Unlock the Flash to enable the flash control register access */
-	  HAL_FLASH_Unlock();
-
-	  /* Erase the user Flash area defined by FLASH_USER_START_ADDR_RX and FLASH_USER_END_ADDR_RX) */
-
-	  /* Get the 1st sector to erase */
-	  FirstSector = GetSector(FLASH_USER_START_ADDR_RX);
-	  /* Get the number of sector to erase from 1st sector*/
-	  NbOfSectors = GetSector(FLASH_USER_END_ADDR_RX) - FirstSector + 1;
-	  /* Fill EraseInit structure*/
-	  EraseInitStruct.TypeErase     = FLASH_TYPEERASE_SECTORS;
-	  EraseInitStruct.VoltageRange  = FLASH_VOLTAGE_RANGE_3;
-	  EraseInitStruct.Sector        = FirstSector;
-	  EraseInitStruct.NbSectors     = NbOfSectors;
-
-	  if (HAL_FLASHEx_Erase(&EraseInitStruct, &SECTORError) != HAL_OK)
-	  {
-	    /*
-	      Error occurred while sector erase.
-	      User can add here some code to deal with this error.
-	      SECTORError will contain the faulty sector and then to know the code error on this sector,
-	      user can call function 'HAL_FLASH_GetError()'
-	    */
-	    /* Infinite loop */
-	    while (1)
-	    {
-	    	HAL_GPIO_WritePin(GPIOB, LD3_Pin, GPIO_PIN_SET);
-	    }
-	  }
-
-	  /* Add a small delay so the Flash erase can be completed before the CAN is started. */
-	  //HAL_Delay(2000);
-	  HAL_FLASH_Lock();
-    }
-
-  /* Start the CAN and enable interrupts*/
-
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -202,49 +153,20 @@ int main(void)
 
     /* USER CODE BEGIN 3 */
 
-	  //printf("in the while \r\n");
-	  if (TX){
-		  if (board_status == NO_UPDATE_AVAILABLE){
-			  HAL_GPIO_WritePin(GPIOB, LD2_Pin | LD1_Pin, GPIO_PIN_RESET);
-			  HAL_GPIO_TogglePin(GPIOB, LD3_Pin);
-			  HAL_Delay(1000);
-		  }
-		  else if (board_status == SENDING_UPDATE){
-			  HAL_GPIO_WritePin(GPIOB, LD3_Pin | LD1_Pin, GPIO_PIN_RESET);
-			  HAL_GPIO_TogglePin(GPIOB, LD2_Pin);
-			  HAL_Delay(100);
-		  }
-		  else if (board_status == UPDATE_FINISHED){
-			  HAL_GPIO_WritePin(GPIOB, LD2_Pin | LD3_Pin, GPIO_PIN_RESET);
-			  HAL_GPIO_TogglePin(GPIOB, LD1_Pin);
-			  HAL_Delay(1000);
-		  }
+	  if (board_status == NO_UPDATE_AVAILABLE){
+		  HAL_GPIO_WritePin(GPIOB, LD2_Pin | LD1_Pin, GPIO_PIN_RESET);
+		  HAL_GPIO_TogglePin(GPIOB, LD3_Pin);
+		  HAL_Delay(1000);
 	  }
-	  else {
+	  else if (board_status == SENDING_UPDATE){
+		  HAL_GPIO_WritePin(GPIOB, LD3_Pin | LD1_Pin, GPIO_PIN_RESET);
+		  HAL_GPIO_TogglePin(GPIOB, LD2_Pin);
 		  HAL_Delay(100);
-
-		  if (HAL_CAN_GetRxFifoFillLevel(&hcan1, CAN_RX_FIFO0) != 0){
-			  /* Get RX message */
-			  if (HAL_CAN_GetRxMessage(&hcan1, CAN_RX_FIFO0, &RxHeader_CubeSat, RxData) != HAL_OK) {
-				  /* Reception Error */
-				  Error_Handler();
-			  }
-		  }
-		  if (board_status == NO_UPDATE_AVAILABLE){
-			  HAL_GPIO_WritePin(GPIOB, LD2_Pin | LD1_Pin, GPIO_PIN_RESET);
-			  HAL_GPIO_TogglePin(GPIOB, LD3_Pin);
-			  HAL_Delay(1000);
-		  }
-		  else if (board_status == RECEIVING_UPDATE){
-			  HAL_GPIO_WritePin(GPIOB, LD3_Pin | LD1_Pin, GPIO_PIN_RESET);
-			  HAL_GPIO_TogglePin(GPIOB, LD2_Pin);
-			  HAL_Delay(100);
-		  }
-		  else if (board_status == UPDATE_FINISHED){
-			  HAL_GPIO_WritePin(GPIOB, LD2_Pin | LD3_Pin, GPIO_PIN_RESET);
-			  HAL_GPIO_TogglePin(GPIOB, LD1_Pin);
-			  HAL_Delay(1000);
-		  }
+	  }
+	  else if (board_status == UPDATE_FINISHED){
+		  HAL_GPIO_WritePin(GPIOB, LD2_Pin | LD3_Pin, GPIO_PIN_RESET);
+		  HAL_GPIO_TogglePin(GPIOB, LD1_Pin);
+		  HAL_Delay(1000);
 	  }
   }
   /* USER CODE END 3 */
@@ -563,50 +485,6 @@ uint32_t Read_Message_and_Write_in_FLASH(uint32_t StartSectorAddress, uint32_t E
 //	}
 //	return ack_status;
 //}
-
-/**
-  * @brief  Gets the sector of a given address
-  * @param  None
-  * @retval The sector of a given address
-  */
-static uint32_t GetSector(uint32_t Address)
-{
-  uint32_t sector = 0;
-
-  if((Address < ADDR_FLASH_SECTOR_1_START) && (Address >= ADDR_FLASH_SECTOR_0_START))
-  {
-    sector = FLASH_SECTOR_0;
-  }
-  else if((Address < ADDR_FLASH_SECTOR_2_START) && (Address >= ADDR_FLASH_SECTOR_1_START))
-  {
-    sector = FLASH_SECTOR_1;
-  }
-  else if((Address < ADDR_FLASH_SECTOR_3_START) && (Address >= ADDR_FLASH_SECTOR_2_START))
-  {
-    sector = FLASH_SECTOR_2;
-  }
-  else if((Address < ADDR_FLASH_SECTOR_4_START) && (Address >= ADDR_FLASH_SECTOR_3_START))
-  {
-    sector = FLASH_SECTOR_3;
-  }
-  else if((Address < ADDR_FLASH_SECTOR_5_START) && (Address >= ADDR_FLASH_SECTOR_4_START))
-  {
-    sector = FLASH_SECTOR_4;
-  }
-  else if((Address < ADDR_FLASH_SECTOR_6_START) && (Address >= ADDR_FLASH_SECTOR_5_START))
-  {
-    sector = FLASH_SECTOR_5;
-  }
-  else if((Address < ADDR_FLASH_SECTOR_7_START) && (Address >= ADDR_FLASH_SECTOR_6_START))
-  {
-    sector = FLASH_SECTOR_6;
-  }
-  else /* (Address < FLASH_END_ADDR) && (Address >= ADDR_FLASH_SECTOR_7) */
-  {
-    sector = FLASH_SECTOR_7;
-  }
-  return sector;
-}
 
 /**
   * @brief  Gets sector Size
