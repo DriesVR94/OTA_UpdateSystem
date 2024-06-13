@@ -31,7 +31,7 @@ extern "C" {
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "z_flash_W25QXXX.h"
 /* USER CODE END Includes */
 
 /* Exported types ------------------------------------------------------------*/
@@ -57,6 +57,14 @@ void Error_Handler(void);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
+#define FLASH_SCK_Pin GPIO_PIN_5
+#define FLASH_SCK_GPIO_Port GPIOA
+#define FLASH_MISO_Pin GPIO_PIN_6
+#define FLASH_MISO_GPIO_Port GPIOA
+#define FLASH_MOSI_Pin GPIO_PIN_7
+#define FLASH_MOSI_GPIO_Port GPIOA
+#define FLASH_CS_Pin GPIO_PIN_14
+#define FLASH_CS_GPIO_Port GPIOD
 
 /* USER CODE BEGIN Private defines */
 

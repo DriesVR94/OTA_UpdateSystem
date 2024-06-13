@@ -38,9 +38,34 @@
 /* USER CODE BEGIN PM */
 #define MAJOR 0
 #define MINOR 1
+
+
+#define SECTOR_2_START_ADDRESS 0x08008000  // Starting address of sector 2
+#define SECTOR_2_SIZE 0x4000               // Size of sector 2 (16KB)
+
+#define SECTOR_3_START_ADDRESS 0x0800C000  // Starting address of sector 3
+#define SECTOR_3_SIZE 0x4000               // Size of sector 3 (16KB)
+
+#define SECTOR_4_START_ADDRESS 0x08010000  // Starting address of sector 4
+#define SECTOR_4_SIZE 0x10000               // Size of sector 4 (64KB)
+
+#define SECTOR_5_START_ADDRESS 0x08020000  // Starting address of sector 5
+#define SECTOR_5_SIZE 0x20000               // Size of sector 5 (128KB)
+
+#define SECTOR_6_START_ADDRESS 0x08040000  // Starting address of sector 6
+#define SECTOR_6_SIZE 0x20000            // Size of sector 6 (128KB)
+
+
+#define SECTOR_7_START_ADDRESS 0x08060000  // Starting address of sector 7 FREERTOS SECTOR
+#define SECTOR_7_SIZE 0x20000            // Size of sector 7 (128KB)
+
+
+
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
+SPI_HandleTypeDef hspi1;
+
 UART_HandleTypeDef huart3;
 
 /* USER CODE BEGIN PV */
@@ -51,6 +76,7 @@ const uint8_t BL_Version[2] = {MAJOR, MINOR};
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_USART3_UART_Init(void);
+static void MX_SPI1_Init(void);
 /* USER CODE BEGIN PFP */
 static void goto_application( void );
 /* USER CODE END PFP */
@@ -90,10 +116,59 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_USART3_UART_Init();
+  MX_SPI1_Init();
   /* USER CODE BEGIN 2 */
+
+  //STARTING message
   printf("Starting Bootloader (%d.%d)\r\n", BL_Version[0], BL_Version[1]);
   HAL_GPIO_WritePin( GPIOB, GPIO_PIN_0,GPIO_PIN_SET);
   HAL_Delay(2000);
+
+
+  //flash init
+
+  if(!Flash_Init())
+  {
+	  printf("It does not init \r\n");
+  }
+
+
+  // We perform a safety coppy of all the sectors in external SPI memory
+  uint8_t *ptr1 = (uint8_t *)SECTOR_2_START_ADDRESS; //
+  SPI_Flash_Write(0x90008000 ,ptr1,SECTOR_2_SIZE);
+  printf("Sector 2 coppied\r\n");
+
+  ptr1 = (uint8_t *)SECTOR_3_START_ADDRESS; //
+  SPI_Flash_Write(0x9000C000,ptr1,SECTOR_3_SIZE);
+  printf("Sector 3 coppied\r\n");
+
+  ptr1 = (uint8_t *)SECTOR_4_START_ADDRESS; //
+  SPI_Flash_Write(0x90010000,ptr1,SECTOR_4_SIZE);
+  printf("Sector 4 coppied\r\n");
+
+
+  // Copy sector 5 in two rounds of 64KB each
+  ptr1 = (uint8_t *)SECTOR_5_START_ADDRESS;
+  SPI_Flash_Write(0x90020000, ptr1, 0x10000);  // First 64KB
+  printf("Sector 5 part 1 copied\r\n");
+  SPI_Flash_Write(0x90030000, ptr1 + 0x10000, 0x10000);  // Second 64KB
+  printf("Sector 5 part 2 copied\r\n");
+
+  // Copy sector 6 in two rounds of 64KB each
+  ptr1 = (uint8_t *)SECTOR_6_START_ADDRESS;
+  SPI_Flash_Write(0x90040000, ptr1, 0x10000);  // First 64KB
+  printf("Sector 6 part 1 copied\r\n");
+  SPI_Flash_Write(0x90050000, ptr1 + 0x10000, 0x10000);  // Second 64KB
+  printf("Sector 6 part 2 copied\r\n");
+
+  // Copy sector 7 in two rounds of 64KB each			RTOS INSIDE
+  ptr1 = (uint8_t *)SECTOR_7_START_ADDRESS;
+  SPI_Flash_Write(0x90060000, ptr1, 0x10000);  // First 64KB
+  printf("Sector 7 part 1 copied\r\n");
+  SPI_Flash_Write(0x90070000, ptr1 + 0x10000, 0x10000);  // Second 64KB
+  printf("Sector 7 part 2 copied\r\n");
+
+
 
   goto_application();
 
@@ -142,13 +217,51 @@ void SystemClock_Config(void)
                               |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
   RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_HSI;
   RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
-  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV1;
+  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV2;
   RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
 
   if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_0) != HAL_OK)
   {
     Error_Handler();
   }
+}
+
+/**
+  * @brief SPI1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_SPI1_Init(void)
+{
+
+  /* USER CODE BEGIN SPI1_Init 0 */
+
+  /* USER CODE END SPI1_Init 0 */
+
+  /* USER CODE BEGIN SPI1_Init 1 */
+
+  /* USER CODE END SPI1_Init 1 */
+  /* SPI1 parameter configuration*/
+  hspi1.Instance = SPI1;
+  hspi1.Init.Mode = SPI_MODE_MASTER;
+  hspi1.Init.Direction = SPI_DIRECTION_2LINES;
+  hspi1.Init.DataSize = SPI_DATASIZE_8BIT;
+  hspi1.Init.CLKPolarity = SPI_POLARITY_LOW;
+  hspi1.Init.CLKPhase = SPI_PHASE_1EDGE;
+  hspi1.Init.NSS = SPI_NSS_SOFT;
+  hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_2;
+  hspi1.Init.FirstBit = SPI_FIRSTBIT_MSB;
+  hspi1.Init.TIMode = SPI_TIMODE_DISABLE;
+  hspi1.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
+  hspi1.Init.CRCPolynomial = 10;
+  if (HAL_SPI_Init(&hspi1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN SPI1_Init 2 */
+
+  /* USER CODE END SPI1_Init 2 */
+
 }
 
 /**
@@ -196,11 +309,15 @@ static void MX_GPIO_Init(void)
 /* USER CODE END MX_GPIO_Init_1 */
 
   /* GPIO Ports Clock Enable */
+  __HAL_RCC_GPIOA_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
   __HAL_RCC_GPIOD_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(FLASH_CS_GPIO_Port, FLASH_CS_Pin, GPIO_PIN_SET);
 
   /*Configure GPIO pin : PB0 */
   GPIO_InitStruct.Pin = GPIO_PIN_0;
@@ -208,6 +325,13 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : FLASH_CS_Pin */
+  GPIO_InitStruct.Pin = FLASH_CS_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
+  HAL_GPIO_Init(FLASH_CS_GPIO_Port, &GPIO_InitStruct);
 
 /* USER CODE BEGIN MX_GPIO_Init_2 */
 /* USER CODE END MX_GPIO_Init_2 */
