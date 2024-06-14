@@ -63,8 +63,14 @@ void Error_Handler(void);
 #define FLASH_MISO_GPIO_Port GPIOA
 #define FLASH_MOSI_Pin GPIO_PIN_7
 #define FLASH_MOSI_GPIO_Port GPIOA
+#define LD1_Pin GPIO_PIN_0
+#define LD1_GPIO_Port GPIOB
+#define LD3_Pin GPIO_PIN_14
+#define LD3_GPIO_Port GPIOB
 #define FLASH_CS_Pin GPIO_PIN_14
 #define FLASH_CS_GPIO_Port GPIOD
+#define LD2_Pin GPIO_PIN_7
+#define LD2_GPIO_Port GPIOB
 
 /* USER CODE BEGIN Private defines */
 

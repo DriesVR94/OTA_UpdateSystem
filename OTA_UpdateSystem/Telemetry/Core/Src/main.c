@@ -33,13 +33,23 @@
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 
-/* Before transmitting, make sure that there is an 'update' available in the sector defined below.
+/* Before transmitting, make sure that there is an 'update' available in one of the sectors defined below.
  * This update will then be sent from one F446 board to another through the CAN bus.
  * One board simulates the telemetry module (= responsible from communication with the ground station) on a CubeSat,
  * the other board simulates the on-board computer (OBC) of the CubeSat. */
 
-#define FLASH_USER_START_ADDR_TX   ADDR_FLASH_SECTOR_7_START		/* Start @ of user Flash area */
-#define FLASH_USER_END_ADDR_TX     ADDR_FLASH_SECTOR_7_END 			/* End @ of user Flash area */
+//#define FLASH_USER_START_ADDR_TX   	ADDR_FLASH_SECTOR_7_START		/* Start @ of user Flash area */
+//#define FLASH_USER_END_ADDR_TX     	ADDR_FLASH_SECTOR_7_END 		/* End @ of user Flash area */
+
+
+/* We define some storage sectors where updates can be stored.
+ * Depending on the size of the update, the user should pick a suitable storage sector. */
+#define UPDATE_STORAGE_SECTOR_0		ADDR_FLASH_SECTOR_2_START
+#define UPDATE_STORAGE_SECTOR_1		ADDR_FLASH_SECTOR_3_START
+#define UPDATE_STORAGE_SECTOR_2		ADDR_FLASH_SECTOR_4_START
+#define UPDATE_STORAGE_SECTOR_3		ADDR_FLASH_SECTOR_5_START
+#define UPDATE_STORAGE_SECTOR_4		ADDR_FLASH_SECTOR_6_START
+#define UPDATE_STORAGE_SECTOR_5		ADDR_FLASH_SECTOR_7_START
 
 /* USER CODE END PD */
 
@@ -50,21 +60,28 @@
 
 /* Private variables ---------------------------------------------------------*/
 CAN_HandleTypeDef hcan1;
-
 UART_HandleTypeDef huart3;
 
 /* USER CODE BEGIN PV */
 
 // CAN variables
-CAN_TxHeaderTypeDef   	TxHeader;
-uint8_t               	TxData[8];
-uint8_t               	RxData[8];
-uint8_t 				TxBuffer;
-uint32_t              	TxMailbox;
+CAN_TxHeaderTypeDef   			TxHeader;
+CAN_RxHeaderTypeDef   			RxHeader;
+uint8_t               			TxData[8];
+uint8_t               			RxData[8];
+uint8_t 						TxBuffer;
+uint32_t              			TxMailbox;
+enum standard_message_id		{APP_0 = 0b00000000000, APP_1 = 0b00000000001, APP_2 = 0b00000000010};
+enum standard_message_id		standard_message_id = APP_0;
+uint8_t							id_sent_and_received_flag;
 
 // Board status variables
-enum board_status 	  	{READY_FOR_UPDATE, SENDING_UPDATE, RECEIVING_UPDATE, UPDATE_FINISHED};
-enum board_status 	  	board_status = READY_FOR_UPDATE;
+enum board_status 	  			{READY_FOR_UPDATE, SENDING_UPDATE, RECEIVING_UPDATE, UPDATE_FINISHED};
+enum board_status 	  			board_status = READY_FOR_UPDATE;
+
+// Flash memory variables
+uint32_t 						update_storage_sector;
+uint32_t						flash_sector;
 
 /* USER CODE END PV */
 
@@ -73,11 +90,13 @@ void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_USART3_UART_Init(void);
 static void MX_CAN1_Init(void);
-/* USER CODE BEGIN PFP */
 
+/* USER CODE BEGIN PFP */
 /* Function prototypes for Flash Operations */
 static uint32_t GetSectorSize(uint32_t Sector);
 static void Read_FLASH_and_Prepare_Data_for_CAN(uint32_t Sector, uint32_t StartSectorAddress);
+static void SendID(void);
+static uint32_t Set_ID_and_Flash_Sector(uint32_t UpdateStorageSector);
 
 /* USER CODE END PFP */
 
@@ -93,6 +112,14 @@ static void Read_FLASH_and_Prepare_Data_for_CAN(uint32_t Sector, uint32_t StartS
 int main(void)
 {
   /* USER CODE BEGIN 1 */
+	/* The user needs to define from which UPDATE_STORAGE_SECTOR an update will be performed. */
+	update_storage_sector = UPDATE_STORAGE_SECTOR_0;
+	Set_ID_and_Flash_Sector(update_storage_sector);
+
+	/* After sending the ID, the receiver will respond to confirm that data can be transmitted.
+	 * After this confirmation, the flag below will be set. */
+	id_sent_and_received_flag = 0;
+
 
   /* USER CODE END 1 */
 
@@ -145,6 +172,14 @@ int main(void)
 		  HAL_GPIO_TogglePin(GPIOB, LD1_Pin);							// Green LED will blink
 		  HAL_Delay(1000);
 	  }
+
+	  /* When the flag is set, the actual update will be transmitted. */
+	  //if (id_sent_and_received_flag == 1){
+		  /* Start reading the flash sector that holds the update. */
+		  //id_sent_and_received_flag == 0;
+		  //TxHeader.DLC = 8;
+		  //Read_FLASH_and_Prepare_Data_for_CAN(flash_sector, update_storage_sector);
+	  //}
   }
   /* USER CODE END 3 */
 }
@@ -166,10 +201,15 @@ void SystemClock_Config(void)
   /** Initializes the RCC Oscillators according to the specified parameters
   * in the RCC_OscInitTypeDef structure.
   */
-  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI;
-  RCC_OscInitStruct.HSIState = RCC_HSI_ON;
-  RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
-  RCC_OscInitStruct.PLL.PLLState = RCC_PLL_NONE;
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
+  RCC_OscInitStruct.HSEState = RCC_HSE_BYPASS;
+  RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
+  RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
+  RCC_OscInitStruct.PLL.PLLM = 4;
+  RCC_OscInitStruct.PLL.PLLN = 84;
+  RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV2;
+  RCC_OscInitStruct.PLL.PLLQ = 7;
+  RCC_OscInitStruct.PLL.PLLR = 2;
   if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
   {
     Error_Handler();
@@ -179,12 +219,12 @@ void SystemClock_Config(void)
   */
   RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
                               |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
-  RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_HSI;
+  RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
   RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
   RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV2;
   RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV2;
 
-  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_0) != HAL_OK)
+  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2) != HAL_OK)
   {
     Error_Handler();
   }
@@ -250,11 +290,11 @@ static void MX_CAN1_Init(void)
       Error_Handler();
     }
 
-  TxHeader.StdId = 0b00000000000;
+  TxHeader.StdId = standard_message_id;
   TxHeader.ExtId = 0x00;
   TxHeader.RTR = CAN_RTR_DATA;
   TxHeader.IDE = CAN_ID_STD;
-  TxHeader.DLC = 8; // Data length is equal to 8
+  TxHeader.DLC = 0; 		/* This variable will be set at other places in the code. */
   TxHeader.TransmitGlobalTime = DISABLE;
 
   /* USER CODE END CAN1_Init 2 */
@@ -337,10 +377,58 @@ static void MX_GPIO_Init(void)
 
 /* USER CODE BEGIN 4 */
 
+/* The purpose of this function is to send the TxHeader containing the ID of the message.
+ * This ID will be used by the receiver to determine in which flash sector the following message
+ * will be stored. This initial message does not contain any useful data. */
+void SendID(){
+	TxHeader.DLC = 1;
+	TxData[0] = 0b00000000;
+	HAL_CAN_AddTxMessage(&hcan1, &TxHeader, TxData, &TxMailbox);
+	printf("message added \r\n");
+	printf("TxData: %02X \r\n", TxData[0]);
+}
+
+/* Based on the chosen sector chosen, the ID of the messages containing the update will be set.
+ * The Filter Matching Index is used by the receiving board to determine in which flash sector it
+ * needs to write the update.
+ * APP_0 (ID 0b00000000000) corresponds to Filter Matching Index 0.
+ * APP_1 (ID 0b00000000001) corresponds to Filter Matching Index 2.
+ * APP_2 (ID 0b00000000010) corresponds to Filter Matching Index 4 */
+uint32_t Set_ID_and_Flash_Sector(uint32_t UpdateStorageSector){
+
+	if (UpdateStorageSector == UPDATE_STORAGE_SECTOR_0){
+		standard_message_id = APP_0;
+		flash_sector = FLASH_SECTOR_2;
+	}
+	else if (UpdateStorageSector == UPDATE_STORAGE_SECTOR_1){
+		standard_message_id = APP_1;
+		flash_sector = FLASH_SECTOR_3;
+	}
+	else {
+		standard_message_id = APP_2;
+		flash_sector = FLASH_SECTOR_4;
+	}
+	return standard_message_id;
+}
+
+void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan)
+{
+	  if (HAL_CAN_GetRxMessage(hcan, CAN_RX_FIFO0, &RxHeader, RxData) != HAL_OK)
+	  {
+	    /* Reception Error */
+	    Error_Handler();
+	  }
+	  if ((RxHeader.DLC == 1) && (RxData[0] == 0b11111111)){
+		  //id_sent_and_received_flag = 1;
+		  TxHeader.DLC = 8;
+		  Read_FLASH_and_Prepare_Data_for_CAN(flash_sector, update_storage_sector);
+	  }
+}
+
+
 /* We will read the full sector. We read a byte each time and pass it to the TxData[i] of the CAN.
  * The maximum amount of data the CAN protocol can send per message is 8 bytes,
  * so we will repeat the read operation 8 times. */
-
 void Read_FLASH_and_Prepare_Data_for_CAN(uint32_t Sector, uint32_t StartSectorAddress){
 
 	board_status = SENDING_UPDATE;
@@ -404,9 +492,8 @@ static uint32_t GetSectorSize(uint32_t Sector)
 
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){
 	if (GPIO_Pin == GPIO_PIN_13){
-
-		// Start reading the Flash sector where we stored the .bin file of the update.
-		Read_FLASH_and_Prepare_Data_for_CAN(FLASH_SECTOR_7, FLASH_USER_START_ADDR_TX);
+		printf("send ID \r\n");
+		SendID();
 	}
 }
 
