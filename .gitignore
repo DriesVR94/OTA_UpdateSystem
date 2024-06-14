@@ -10,6 +10,10 @@ debug/
 Release/
 release
 
+Backup_versions/
+OTA_UpdateSystem/App_1/
+
+
 # Prerequisites
 *.d
 
