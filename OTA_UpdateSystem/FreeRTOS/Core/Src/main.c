@@ -41,14 +41,8 @@
  * One board simulates the telemetry module (= responsible from communication with the ground station) on a CubeSat,
  * the other board simulates the on-board computer (OBC) of the CubeSat. */
 
-#define FLASH_USER_START_ADDR_RX   ADDR_FLASH_SECTOR_5_START		/* Start @ of user Flash area */
-#define FLASH_USER_END_ADDR_RX     ADDR_FLASH_SECTOR_5_END 			/* End @ of user Flash area */
-
-//#define CUSTOM_SECTION_0			0x08008000
-//#define CUSTOM_SECTION_1			0x0800C000
-//#define CUSTOM_SECTION_2			0x08010000
-//#define CUSTOM_SECTION_3			0x08020000
-//#define CUSTOM_SECTION_4			0x08040000
+//#define FLASH_USER_START_ADDR_RX   ADDR_FLASH_SECTOR_5_START		/* Start @ of user Flash area */
+//#define FLASH_USER_END_ADDR_RX     ADDR_FLASH_SECTOR_5_END 			/* End @ of user Flash area */
 
 /* USER CODE END PD */
 
@@ -92,20 +86,28 @@ const osThreadAttr_t app3_attributes = {
   .priority = (osPriority_t) osPriorityLow,
 };
 /* USER CODE BEGIN PV */
-// CAN variables
-CAN_RxHeaderTypeDef   	RxHeader;
-CAN_TxHeaderTypeDef   	TxHeader;
-uint8_t               	TxData[8];
-uint8_t               	RxData[8];
-uint32_t              	TxMailbox;
-
-// Flash Operation variables
-uint32_t FirstSector = 0, NbOfSectors = 0;
-uint32_t Start_Address = 0, Write_Address = 0, SECTORError = 0;
-uint8_t TxBuffer;
 
 
 const uint8_t			APP_Version[2]={MAJOR, MINOR};
+
+// CAN variables
+CAN_RxHeaderTypeDef   	RxHeader;
+uint8_t               	TxData[8];
+uint8_t               	RxData[8];
+uint32_t              	TxMailbox;
+QueueHandle_t canRxQueue;
+
+// Board status variables
+enum board_status 	  	{NO_UPDATE_AVAILABLE, SENDING_UPDATE, RECEIVING_UPDATE, UPDATE_FINISHED};
+enum board_status 	  	board_status = NO_UPDATE_AVAILABLE;
+
+// Flash Operation variables
+uint32_t FirstSector = 0, NbOfSectors = 0;
+uint32_t Address = 0, SECTORError = 0;
+__IO uint32_t data32 = 0 , MemoryProgramStatus = 0;
+uint8_t TxBuffer;
+
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -120,11 +122,13 @@ void StartApp3(void *argument);
 void StartApp1_1(void *argument);
 
 /* USER CODE BEGIN PFP */
+void SystemReset(void);
 void StopAllThreads(void);
 void RebootToApplication(void);
-//static uint32_t GetFilterMatchingIndex(CAN_RxHeaderTypeDef *RxHeader);
-//static uint32_t SetFlashSectorForWritingUpdate(uint32_t FilterMatchIndex);
-void SystemReset(void);
+
+
+/* Function prototypes for Flash Operations */
+
 
 /* USER CODE END PFP */
 
@@ -167,7 +171,7 @@ int main(void)
   /* USER CODE BEGIN 2 */
 
   /* Start the CAN and enable interrupts*/
-  HAL_CAN_Start(&hcan1);
+ HAL_CAN_Start(&hcan1);
 
 
   /* USER CODE END 2 */
@@ -190,6 +194,7 @@ int main(void)
   /* USER CODE BEGIN RTOS_QUEUES */
   /* add queues, ... */
 
+
   /* USER CODE END RTOS_QUEUES */
 
   /* Create the thread(s) */
@@ -207,8 +212,6 @@ int main(void)
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
-
-
 
 
   /* USER CODE END RTOS_THREADS */
@@ -279,6 +282,70 @@ void SystemClock_Config(void)
   {
     Error_Handler();
   }
+}
+
+/**
+  * @brief CAN1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_CAN1_Init(void)
+{
+
+  /* USER CODE BEGIN CAN1_Init 0 */
+  CAN_FilterTypeDef  sFilterConfig0;
+  /* USER CODE END CAN1_Init 0 */
+
+  /* USER CODE BEGIN CAN1_Init 1 */
+
+  /* USER CODE END CAN1_Init 1 */
+  hcan1.Instance = CAN1;
+  hcan1.Init.Prescaler = 4;
+  hcan1.Init.Mode = CAN_MODE_NORMAL;
+  hcan1.Init.SyncJumpWidth = CAN_SJW_1TQ;
+  hcan1.Init.TimeSeg1 = CAN_BS1_13TQ;
+  hcan1.Init.TimeSeg2 = CAN_BS2_2TQ;
+  hcan1.Init.TimeTriggeredMode = DISABLE;
+  hcan1.Init.AutoBusOff = DISABLE;
+  hcan1.Init.AutoWakeUp = DISABLE;
+  hcan1.Init.AutoRetransmission = ENABLE;
+  hcan1.Init.ReceiveFifoLocked = DISABLE;
+  hcan1.Init.TransmitFifoPriority = DISABLE;
+  if (HAL_CAN_Init(&hcan1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN CAN1_Init 2 */
+
+  sFilterConfig0.FilterBank = 0;
+  sFilterConfig0.FilterMode = CAN_FILTERMODE_IDMASK;
+  sFilterConfig0.FilterScale = CAN_FILTERSCALE_32BIT;
+  sFilterConfig0.FilterIdHigh = 0x0000;
+  sFilterConfig0.FilterIdLow = 0x0000;
+  sFilterConfig0.FilterMaskIdHigh = 0x0000;
+  sFilterConfig0.FilterMaskIdLow = 0x0000;
+  sFilterConfig0.FilterFIFOAssignment = CAN_RX_FIFO0;
+  sFilterConfig0.FilterActivation = ENABLE;
+  sFilterConfig0.SlaveStartFilterBank = 14;
+  if (HAL_CAN_ConfigFilter(&hcan1, &sFilterConfig0) != HAL_OK) {
+	/* Filter configuration Error */
+	Error_Handler();
+  }
+
+  if (HAL_CAN_Start(&hcan1) != HAL_OK)
+  {
+    /* Start Error */
+    Error_Handler();
+  }
+
+  if (HAL_CAN_ActivateNotification(&hcan1, CAN_IT_RX_FIFO0_MSG_PENDING) != HAL_OK)
+    {
+    /* Notification Error */
+      Error_Handler();
+    }
+
+  /* USER CODE END CAN1_Init 2 */
+
 }
 
 /**
@@ -355,101 +422,19 @@ static void MX_GPIO_Init(void)
 /* USER CODE END MX_GPIO_Init_2 */
 }
 
-static void MX_CAN1_Init(void)
+/* USER CODE BEGIN 4 */
+
+void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan)
 {
-
-  /* USER CODE BEGIN CAN1_Init 0 */
-  CAN_FilterTypeDef  sFilterConfig0;
-  CAN_FilterTypeDef	 sFilterConfig1;
-  CAN_FilterTypeDef	 sFilterConfig2;
-
-  /* USER CODE END CAN1_Init 0 */
-
-  /* USER CODE BEGIN CAN1_Init 1 */
-
-  /* USER CODE END CAN1_Init 1 */
-  hcan1.Instance = CAN1;
-  hcan1.Init.Prescaler = 4;
-  hcan1.Init.Mode = CAN_MODE_NORMAL;
-  hcan1.Init.SyncJumpWidth = CAN_SJW_1TQ;
-  hcan1.Init.TimeSeg1 = CAN_BS1_13TQ;
-  hcan1.Init.TimeSeg2 = CAN_BS2_2TQ;
-  hcan1.Init.TimeTriggeredMode = DISABLE;
-  hcan1.Init.AutoBusOff = DISABLE;
-  hcan1.Init.AutoWakeUp = DISABLE;
-  hcan1.Init.AutoRetransmission = ENABLE;
-  hcan1.Init.ReceiveFifoLocked = DISABLE;
-  hcan1.Init.TransmitFifoPriority = DISABLE;
-  if (HAL_CAN_Init(&hcan1) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN CAN1_Init 2 */
-
-  // Configuring the filter for Application 0.
-  sFilterConfig0.FilterBank = 0;
-  sFilterConfig0.FilterMode = CAN_FILTERMODE_IDLIST;
-  sFilterConfig0.FilterScale = CAN_FILTERSCALE_32BIT;
-  sFilterConfig0.FilterIdHigh = 0x0000;
-  sFilterConfig0.FilterIdLow = 0x0000;
-  sFilterConfig0.FilterMaskIdHigh = 0x0000;
-  sFilterConfig0.FilterMaskIdLow = 0x0000;
-  sFilterConfig0.FilterFIFOAssignment = CAN_RX_FIFO0;
-  sFilterConfig0.FilterActivation = ENABLE;
-  sFilterConfig0.SlaveStartFilterBank = 14;
-  if (HAL_CAN_ConfigFilter(&hcan1, &sFilterConfig0) != HAL_OK) {
-	/* Filter configuration Error */
-	Error_Handler();
-  }
-
-  // Configuring the filter for Application 1.
-  sFilterConfig1.FilterBank = 1;
-  sFilterConfig1.FilterMode = CAN_FILTERMODE_IDLIST;
-  sFilterConfig1.FilterScale = CAN_FILTERSCALE_32BIT;
-  sFilterConfig1.FilterIdHigh = 0x0020;
-  sFilterConfig1.FilterIdLow = 0x0000;
-  sFilterConfig1.FilterMaskIdHigh = 0x0000;
-  sFilterConfig1.FilterMaskIdLow = 0x0000;
-  sFilterConfig1.FilterFIFOAssignment = CAN_RX_FIFO0;
-  sFilterConfig1.FilterActivation = ENABLE;
-  sFilterConfig1.SlaveStartFilterBank = 14;
-  if (HAL_CAN_ConfigFilter(&hcan1, &sFilterConfig1) != HAL_OK) {
-	/* Filter configuration Error */
-	Error_Handler();
-  }
-
-  // Configuring the filter for Application 2.
-  sFilterConfig2.FilterBank = 2;
-  sFilterConfig2.FilterMode = CAN_FILTERMODE_IDLIST;
-  sFilterConfig2.FilterScale = CAN_FILTERSCALE_32BIT;
-  sFilterConfig2.FilterIdHigh = 0x0040;
-  sFilterConfig2.FilterIdLow = 0x0000;
-  sFilterConfig2.FilterMaskIdHigh = 0x0000;
-  sFilterConfig2.FilterMaskIdLow = 0x0000;
-  sFilterConfig2.FilterFIFOAssignment = CAN_RX_FIFO0;
-  sFilterConfig2.FilterActivation = ENABLE;
-  sFilterConfig2.SlaveStartFilterBank = 14;
-  if (HAL_CAN_ConfigFilter(&hcan1, &sFilterConfig2) != HAL_OK) {
-	/* Filter configuration Error */
-	Error_Handler();
-  }
-
-  if (HAL_CAN_Start(&hcan1) != HAL_OK)
-  {
-    /* Start Error */
-    Error_Handler();
-  }
-
-  if (HAL_CAN_ActivateNotification(&hcan1, CAN_IT_RX_FIFO0_MSG_PENDING) != HAL_OK)
+	printf("msg callback \r\n");
+    // Get the message
+    if (HAL_CAN_GetRxMessage(hcan, CAN_RX_FIFO0, &RxHeader, RxData) == HAL_OK)
     {
-    /* Notification Error */
-      Error_Handler();
+    	printf("Got msg \r\n");
     }
 
-  /* USER CODE END CAN1_Init 2 */
 }
 
-/* USER CODE BEGIN 4 */
 
 /* Enabling a print function for Putty. */
 #ifdef __GNUC__
@@ -464,95 +449,55 @@ int fputc(int ch, FILE *f)
 	return ch;
 }
 
-void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan)
+
+uint32_t Read_Message_and_Write_in_FLASH(uint32_t Address, uint32_t EndSectorAddress, uint8_t *data, uint8_t length)
 {
-	printf("In MsgPcallback \r\n");
+    //printf("Entering Read_Message_and_Write_in_FLASH\r\n");
+    HAL_FLASH_Unlock();
+    //printf("Flash unlocked\r\n");
+    board_status = RECEIVING_UPDATE;
 
-    /* Check whether the message is meant to communicate the ID or whether it holds actual data. */
-    if (HAL_CAN_GetRxMessage(hcan, CAN_RX_FIFO0, &RxHeader, RxData) == HAL_OK)
+    for (uint8_t i = 0; i < length; i++)
     {
-    	/* If it holds the ID, we will reserve a flash sector for the coming update.
-    	 * After that, we will respond to the transmitter to confirm it can start sending the actual data.*/
-    	if ((RxHeader.DLC == 1) && (RxData[0] == 0b11111111)){
-//        	uint32_t fmi = GetFilterMatchingIndex(&RxHeader);
-//        	printf("fmi: %lu \r\n", fmi);
-//        	Start_Address = SetFlashSectorForWritingUpdate(fmi);
-//        	printf("Start Address: %lX \r\n", Start_Address);
+        if (Address > EndSectorAddress)
+        {
+            // Handle error: Flash address out of range
+            printf("Flash address out of range\r\n");
+            break;
+        }
 
-        	/* Prepare the response and send it. */
-        	TxHeader.DLC = 1;
-        	TxData[0] = 0b11111111;
-        	HAL_CAN_AddTxMessage(&hcan1, &TxHeader, TxData, &TxMailbox);
-        	printf("response sent \r\n");
-
-    		SystemReset();
-    	}
-
-    	else{
-    		printf("Message rejected. \r\n");
-    	}
-
-
+        HAL_StatusTypeDef flash_status = HAL_FLASH_Program(FLASH_TYPEPROGRAM_BYTE, Address, data[i]);
+        if (flash_status == HAL_OK)
+        {
+            //printf("Flash write successful: %02X at address %lu\r\n", data[i], Address);
+            Address++;
+        }
+        else
+        {
+            printf("Flash write failed: status=%d\r\n", flash_status);
+            HAL_FLASH_Lock();
+            Error_Handler();
+        }
     }
+
+    printf("Address %lu\r\n", Address);
+    HAL_FLASH_Lock();
+    //printf("Flash locked\r\n");
+
+    //printf("Exiting Read_Message_and_Write_in_FLASH\r\n");
+    return Address;
 }
 
-/* Function to trigger a system reset */
+
+
+
+
+// Function to trigger a system reset
 void SystemReset(void)
 {
     printf("System resetting...\r\n");
     HAL_NVIC_SystemReset();
 }
-
-//static uint32_t GetFilterMatchingIndex(CAN_RxHeaderTypeDef *RxHeader)
-//{
-//	if (RxHeader->FilterMatchIndex == 0){
-//		printf("This is for App0. \r\n");
-//	}
-//	else if (RxHeader->FilterMatchIndex == 2){
-//		printf("This is for App1. \r\n");
-//	}
-//	else if (RxHeader->FilterMatchIndex == 4){
-//			printf("This is for App2. \r\n");
-//		}
-//	else if (RxHeader->FilterMatchIndex == 6){
-//			printf("This is for App3. \r\n");
-//		}
-//	else if (RxHeader->FilterMatchIndex == 8){
-//			printf("This is for App4. \r\n");
-//		}
-//	else {
-//		printf("Rejected. \r\n");
-//	}
-//
-//	return RxHeader->FilterMatchIndex;
-//}
-//
-//static uint32_t SetFlashSectorForWritingUpdate(uint32_t FilterMatchIndex){
-//	if (FilterMatchIndex == 0){
-//		Start_Address = CUSTOM_SECTION_0;
-//		Write_Address = Start_Address;
-//	}
-//	else if (FilterMatchIndex == 2){
-//		Start_Address = CUSTOM_SECTION_1;
-//		Write_Address = Start_Address;
-//	}
-//	else if (FilterMatchIndex == 4){
-//		Start_Address = CUSTOM_SECTION_2;
-//		Write_Address = Start_Address;
-//	}
-//	else if (FilterMatchIndex == 6){
-//		Start_Address = CUSTOM_SECTION_3;
-//		Write_Address = Start_Address;
-//	}
-//	else if (FilterMatchIndex == 8){
-//		Start_Address = CUSTOM_SECTION_4;
-//		Write_Address = Start_Address;
-//	}
-//	else {
-//		printf("No Filter Match. \r\n");
-//	}
-//	return Start_Address;
-//}
 
 void StopAllThreads(void)
 {
@@ -592,23 +537,23 @@ void ShowBoardStatus(void *argument)
   /* Infinite loop */
   for(;;)
   {
-//	  osDelay(100);
-//	  if (board_status == NO_UPDATE_AVAILABLE){
-//		  HAL_GPIO_WritePin(GPIOB, LD2_Pin | LD1_Pin, GPIO_PIN_RESET);
-//		  HAL_GPIO_TogglePin(GPIOB, LD3_Pin);
-//		  osDelay(1000);
-//	  }
-//	  else if (board_status == RECEIVING_UPDATE){
-//		  HAL_GPIO_WritePin(GPIOB, LD3_Pin | LD1_Pin, GPIO_PIN_RESET);
-//		  HAL_GPIO_TogglePin(GPIOB, LD2_Pin);
-//		  osDelay(100);
-//	  }
-//	  else if (board_status == UPDATE_FINISHED){
-//		  HAL_GPIO_WritePin(GPIOB, LD2_Pin | LD3_Pin, GPIO_PIN_RESET);
-//		  HAL_GPIO_TogglePin(GPIOB, LD1_Pin);
-//		  osDelay(1000);
-//	  }
-//	  osDelay(1);
+	  osDelay(100);
+	  if (board_status == NO_UPDATE_AVAILABLE){
+		  HAL_GPIO_WritePin(GPIOB, LD2_Pin | LD1_Pin, GPIO_PIN_RESET);
+		  HAL_GPIO_TogglePin(GPIOB, LD3_Pin);
+		  osDelay(1000);
+	  }
+	  else if (board_status == RECEIVING_UPDATE){
+		  HAL_GPIO_WritePin(GPIOB, LD3_Pin | LD1_Pin, GPIO_PIN_RESET);
+		  HAL_GPIO_TogglePin(GPIOB, LD2_Pin);
+		  osDelay(100);
+	  }
+	  else if (board_status == UPDATE_FINISHED){
+		  HAL_GPIO_WritePin(GPIOB, LD2_Pin | LD3_Pin, GPIO_PIN_RESET);
+		  HAL_GPIO_TogglePin(GPIOB, LD1_Pin);
+		  osDelay(1000);
+	  }
+	  osDelay(1);
   }
   /* USER CODE END 5 */
 }
