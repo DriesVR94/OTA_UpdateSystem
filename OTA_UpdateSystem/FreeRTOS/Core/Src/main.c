@@ -92,6 +92,7 @@ const uint8_t			APP_Version[2]={MAJOR, MINOR};
 
 // CAN variables
 CAN_RxHeaderTypeDef   	RxHeader;
+CAN_TxHeaderTypeDef   	TxHeader;
 uint8_t               	TxData[8];
 uint8_t               	RxData[8];
 uint32_t              	TxMailbox;
@@ -431,9 +432,15 @@ void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan)
     if (HAL_CAN_GetRxMessage(hcan, CAN_RX_FIFO0, &RxHeader, RxData) == HAL_OK)
     {
     	printf("Got msg \r\n");
-    	SystemReset();
-    }
+    	if ((RxHeader.DLC == 1) && (RxData[0] == 0b11111111)){
+        	TxHeader.DLC = 1;
+        	TxData[0] = 0b11111111;
+        	HAL_CAN_AddTxMessage(&hcan1, &TxHeader, TxData, &TxMailbox);
+        	printf("response sent \r\n");
 
+        	SystemReset();
+    	}
+    }
 }
 
 /* Enabling a print function for Putty. */
