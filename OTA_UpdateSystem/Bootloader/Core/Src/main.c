@@ -39,6 +39,9 @@
 #define CUSTOM_SECTION_2			0x08010000
 #define CUSTOM_SECTION_3			0x08020000
 #define CUSTOM_SECTION_4			0x08040000
+
+#define INITIALIZATION_FLAG_ADDRESS	0x08007FFC
+#define INITIALIZATION_FLAG_VALUE 	0xAAAAAAAA
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -122,6 +125,8 @@ uint32_t GetSectorSize(uint32_t Sector);
 uint32_t Read_Message_and_Write_in_FLASH(uint32_t StartSectorAddress, uint32_t EndSectorAddress, uint8_t *data, uint8_t length);
 static uint32_t GetFilterMatchingIndex(CAN_RxHeaderTypeDef *RxHeader);
 static uint32_t SetFlashSectorForWritingUpdate(uint32_t FilterMatchIndex);
+static uint32_t checkInitFlag(void);
+static void writeInitFlag(uint32_t initFlag);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -215,7 +220,15 @@ int main(void)
 
 
   /*  */
-  JumpToFreeRTOS();
+  uint32_t initFlag = checkInitFlag();
+  if (initFlag != INITIALIZATION_FLAG_VALUE){
+	  writeInitFlag(INITIALIZATION_FLAG_VALUE);
+	  JumpToFreeRTOS();
+  }
+  else{
+	  printf("Init completed. \r\n");
+  }
+
 
 
 
@@ -475,6 +488,20 @@ int fputc(int ch, FILE *f)
 {
 	HAL_UART_Transmit(&huart3, (uint8_t *)&ch, 1, HAL_MAX_DELAY);
 	return ch;
+}
+
+static uint32_t checkInitFlag(){
+	return *(uint32_t*)INITIALIZATION_FLAG_ADDRESS;
+}
+
+static void writeInitFlag(uint32_t initFlag){
+	HAL_FLASH_Unlock();
+
+    if (HAL_FLASH_Program(TYPEPROGRAM_WORD, INITIALIZATION_FLAG_ADDRESS, initFlag) != HAL_OK) {
+        // Error handling
+    	printf("Flag program error. \r\n");
+    }
+    HAL_FLASH_Lock();
 }
 
 void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan){
