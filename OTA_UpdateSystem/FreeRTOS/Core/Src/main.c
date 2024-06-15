@@ -433,11 +433,6 @@ void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan)
     {
     	printf("Got msg \r\n");
     	if ((RxHeader.DLC == 1) && (RxData[0] == 0b11111111)){
-        	TxHeader.DLC = 1;
-        	TxData[0] = 0b11111111;
-        	HAL_CAN_AddTxMessage(&hcan1, &TxHeader, TxData, &TxMailbox);
-        	printf("response sent \r\n");
-
         	SystemReset();
     	}
     }
