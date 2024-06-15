@@ -24,6 +24,7 @@
 #include <stdio.h>
 #include "F446ZE_FLASH_Sector_Addresses.h"
 #include <stdbool.h>
+#include <stdlib.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -112,7 +113,7 @@ static void MX_USART3_UART_Init(void);
 static void MX_SPI1_Init(void);
 static void MX_CAN1_Init(void);
 /* USER CODE BEGIN PFP */
-static void goto_application( void );
+static void JumpToFreeRTOS( void );
 void CANRxTask(void *argument);
 void SystemReset(void);
 /* Function prototypes for Flash Operations */
@@ -213,8 +214,10 @@ int main(void)
   printf("Sector 7 part 2 copied\r\n");
 
 
-  //HAL_CAN_Stop(&hcan1);
-  goto_application();
+  /*  */
+  JumpToFreeRTOS();
+
+
 
   /* USER CODE END 2 */
 
@@ -531,7 +534,7 @@ static uint32_t SetFlashSectorForWritingUpdate(uint32_t FilterMatchIndex){
 }
 
 
-static void goto_application (void)
+static void JumpToFreeRTOS (void)
 {
 	printf("Gonna Jump to Application \n");
 
