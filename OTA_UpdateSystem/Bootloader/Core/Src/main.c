@@ -91,7 +91,7 @@ uint32_t Start_Address = 0, Write_Address = 0, SECTORError = 0;
 uint8_t TxBuffer;
 
 /*Variable used for Flash Erase procedure*/
-static FLASH_EraseInitTypeDef EraseInitStruct;
+//static FLASH_EraseInitTypeDef EraseInitStruct;
 
 bool flashUpdateDone = false;
 bool flashErased = false;  // Add this line to declare the flashErased variable
@@ -213,6 +213,7 @@ int main(void)
   printf("Sector 7 part 2 copied\r\n");
 
 
+  //HAL_CAN_Stop(&hcan1);
   goto_application();
 
   /* USER CODE END 2 */
