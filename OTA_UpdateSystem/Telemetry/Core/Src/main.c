@@ -56,6 +56,7 @@ UART_HandleTypeDef huart3;
 
 // CAN variables
 CAN_TxHeaderTypeDef   	TxHeader;
+CAN_RxHeaderTypeDef   	RxHeader;
 uint8_t               	TxData[8];
 uint8_t               	RxData[8];
 uint8_t 				TxBuffer;
@@ -347,7 +348,7 @@ static void MX_GPIO_Init(void)
 void SendID(){
 	printf("id sent \r\n");
 	TxHeader.DLC = 1;
-	TxData[0] = 0b00000000;
+	TxData[0] = 0b11111111;
 	HAL_CAN_AddTxMessage(&hcan1, &TxHeader, TxData, &TxMailbox);
 }
 
@@ -420,6 +421,21 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){
 	if (GPIO_Pin == GPIO_PIN_13){
 		SendID();
 	}
+}
+
+void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan)
+{
+	  if (HAL_CAN_GetRxMessage(hcan, CAN_RX_FIFO0, &RxHeader, RxData) != HAL_OK)
+	  {
+	    /* Reception Error */
+	    Error_Handler();
+	  }
+	  if ((RxHeader.DLC == 1) && (RxData[0] == 0b11111111)){
+		  //id_sent_and_received_flag = 1;
+		  TxHeader.DLC = 8;
+		  //Read_FLASH_and_Prepare_Data_for_CAN(flash_sector, update_storage_sector);
+		  Read_FLASH_and_Prepare_Data_for_CAN(FLASH_SECTOR_6, ADDR_FLASH_SECTOR_6_START);
+	  }
 }
 
 

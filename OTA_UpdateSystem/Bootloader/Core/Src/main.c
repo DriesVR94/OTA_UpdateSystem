@@ -33,7 +33,11 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-
+#define CUSTOM_SECTION_0			0x08008000
+#define CUSTOM_SECTION_1			0x0800C000
+#define CUSTOM_SECTION_2			0x08010000
+#define CUSTOM_SECTION_3			0x08020000
+#define CUSTOM_SECTION_4			0x08040000
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -115,6 +119,8 @@ void SystemReset(void);
 uint32_t GetSector(uint32_t Start_Address);
 uint32_t GetSectorSize(uint32_t Sector);
 uint32_t Read_Message_and_Write_in_FLASH(uint32_t StartSectorAddress, uint32_t EndSectorAddress, uint8_t *data, uint8_t length);
+static uint32_t GetFilterMatchingIndex(CAN_RxHeaderTypeDef *RxHeader);
+static uint32_t SetFlashSectorForWritingUpdate(uint32_t FilterMatchIndex);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -207,8 +213,7 @@ int main(void)
   printf("Sector 7 part 2 copied\r\n");
 
 
-
-  //goto_application();
+  goto_application();
 
   /* USER CODE END 2 */
 
@@ -468,6 +473,61 @@ int fputc(int ch, FILE *f)
 	return ch;
 }
 
+void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan){
+	printf("Message callback in BL. \r\n");
+
+}
+
+static uint32_t GetFilterMatchingIndex(CAN_RxHeaderTypeDef *RxHeader)
+{
+	if (RxHeader->FilterMatchIndex == 0){
+		printf("This is for App0. \r\n");
+	}
+	else if (RxHeader->FilterMatchIndex == 2){
+		printf("This is for App1. \r\n");
+	}
+	else if (RxHeader->FilterMatchIndex == 4){
+			printf("This is for App2. \r\n");
+		}
+	else if (RxHeader->FilterMatchIndex == 6){
+			printf("This is for App3. \r\n");
+		}
+	else if (RxHeader->FilterMatchIndex == 8){
+			printf("This is for App4. \r\n");
+		}
+	else {
+		printf("Rejected. \r\n");
+	}
+
+	return RxHeader->FilterMatchIndex;
+}
+
+static uint32_t SetFlashSectorForWritingUpdate(uint32_t FilterMatchIndex){
+	if (FilterMatchIndex == 0){
+		Start_Address = CUSTOM_SECTION_0;
+		Write_Address = Start_Address;
+	}
+	else if (FilterMatchIndex == 2){
+		Start_Address = CUSTOM_SECTION_1;
+		Write_Address = Start_Address;
+	}
+	else if (FilterMatchIndex == 4){
+		Start_Address = CUSTOM_SECTION_2;
+		Write_Address = Start_Address;
+	}
+	else if (FilterMatchIndex == 6){
+		Start_Address = CUSTOM_SECTION_3;
+		Write_Address = Start_Address;
+	}
+	else if (FilterMatchIndex == 8){
+		Start_Address = CUSTOM_SECTION_4;
+		Write_Address = Start_Address;
+	}
+	else {
+		printf("No Filter Match. \r\n");
+	}
+	return Start_Address;
+}
 
 
 static void goto_application (void)
@@ -548,58 +608,58 @@ uint32_t GetSectorSize(uint32_t Sector)
   return sectorsize;
 }
 
-void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan)
-{
-
-	  /* Preparing some variables */
-	  uint32_t sector = GetSector(Start_Address);
-	  uint32_t sectorsize = GetSectorSize(sector);
-
-    // Erase the sector only once before writing the data
-    if (!flashErased)
-    {
-        /* Get the 1st sector to erase */
-        FirstSector = sector;
-        /* Get the number of sectors to erase */
-        NbOfSectors = 1; // Assuming only one sector needs to be erased
-        /* Fill EraseInit structure */
-        EraseInitStruct.TypeErase     = FLASH_TYPEERASE_SECTORS;
-        EraseInitStruct.VoltageRange  = FLASH_VOLTAGE_RANGE_3;
-        EraseInitStruct.Sector        = FirstSector;
-        EraseInitStruct.NbSectors     = NbOfSectors;
-
-        if (HAL_FLASHEx_Erase(&EraseInitStruct, &SECTORError) != HAL_OK)
-        {
-            printf("Error erasing flash sector\r\n");
-            HAL_FLASH_Lock();
-        }
-        else
-        {
-            printf("Flash sector erased successfully\r\n");
-            flashErased = true;
-        }
-    }
-    // Get the message
-    if (HAL_CAN_GetRxMessage(hcan, CAN_RX_FIFO0, &RxHeader, RxData) == HAL_OK)
-    {
-    	printf("got msg \r\n");
-    	Read_Message_and_Write_in_FLASH(Write_Address, Start_Address + sectorsize, RxData, RxHeader.DLC);
-
-    }
-
-    // Set the update complete flag when the last chunk is received and written
-    if (Write_Address == Start_Address + sectorsize)
-    {
-        updateComplete = true;
-
-    }
-    // Check if update is complete and reset the system
-    if (updateComplete)
-    {
-    	printf("Update completed \r\n");
-        SystemReset();
-    }
-}
+//void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan)
+//{
+//
+//	  /* Preparing some variables */
+//	  uint32_t sector = GetSector(Start_Address);
+//	  uint32_t sectorsize = GetSectorSize(sector);
+//
+//    // Erase the sector only once before writing the data
+//    if (!flashErased)
+//    {
+//        /* Get the 1st sector to erase */
+//        FirstSector = sector;
+//        /* Get the number of sectors to erase */
+//        NbOfSectors = 1; // Assuming only one sector needs to be erased
+//        /* Fill EraseInit structure */
+//        EraseInitStruct.TypeErase     = FLASH_TYPEERASE_SECTORS;
+//        EraseInitStruct.VoltageRange  = FLASH_VOLTAGE_RANGE_3;
+//        EraseInitStruct.Sector        = FirstSector;
+//        EraseInitStruct.NbSectors     = NbOfSectors;
+//
+//        if (HAL_FLASHEx_Erase(&EraseInitStruct, &SECTORError) != HAL_OK)
+//        {
+//            printf("Error erasing flash sector\r\n");
+//            HAL_FLASH_Lock();
+//        }
+//        else
+//        {
+//            printf("Flash sector erased successfully\r\n");
+//            flashErased = true;
+//        }
+//    }
+//    // Get the message
+//    if (HAL_CAN_GetRxMessage(hcan, CAN_RX_FIFO0, &RxHeader, RxData) == HAL_OK)
+//    {
+//    	printf("got msg \r\n");
+//    	Read_Message_and_Write_in_FLASH(Write_Address, Start_Address + sectorsize, RxData, RxHeader.DLC);
+//
+//    }
+//
+//    // Set the update complete flag when the last chunk is received and written
+//    if (Write_Address == Start_Address + sectorsize)
+//    {
+//        updateComplete = true;
+//
+//    }
+//    // Check if update is complete and reset the system
+//    if (updateComplete)
+//    {
+//    	printf("Update completed \r\n");
+//        SystemReset();
+//    }
+//}
 
 uint32_t Read_Message_and_Write_in_FLASH(uint32_t Address, uint32_t EndSectorAddress, uint8_t *data, uint8_t length)
 {

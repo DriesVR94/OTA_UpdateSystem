@@ -44,11 +44,11 @@
 #define FLASH_USER_START_ADDR_RX   ADDR_FLASH_SECTOR_5_START		/* Start @ of user Flash area */
 #define FLASH_USER_END_ADDR_RX     ADDR_FLASH_SECTOR_5_END 			/* End @ of user Flash area */
 
-#define CUSTOM_SECTION_0			0x08008000
-#define CUSTOM_SECTION_1			0x0800C000
-#define CUSTOM_SECTION_2			0x08010000
-#define CUSTOM_SECTION_3			0x08020000
-#define CUSTOM_SECTION_4			0x08040000
+//#define CUSTOM_SECTION_0			0x08008000
+//#define CUSTOM_SECTION_1			0x0800C000
+//#define CUSTOM_SECTION_2			0x08010000
+//#define CUSTOM_SECTION_3			0x08020000
+//#define CUSTOM_SECTION_4			0x08040000
 
 /* USER CODE END PD */
 
@@ -122,8 +122,8 @@ void StartApp1_1(void *argument);
 /* USER CODE BEGIN PFP */
 void StopAllThreads(void);
 void RebootToApplication(void);
-static uint32_t GetFilterMatchingIndex(CAN_RxHeaderTypeDef *RxHeader);
-static uint32_t SetFlashSectorForWritingUpdate(uint32_t FilterMatchIndex);
+//static uint32_t GetFilterMatchingIndex(CAN_RxHeaderTypeDef *RxHeader);
+//static uint32_t SetFlashSectorForWritingUpdate(uint32_t FilterMatchIndex);
 void SystemReset(void);
 
 /* USER CODE END PFP */
@@ -473,22 +473,23 @@ void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan)
     {
     	/* If it holds the ID, we will reserve a flash sector for the coming update.
     	 * After that, we will respond to the transmitter to confirm it can start sending the actual data.*/
-    	if ((RxHeader.DLC == 1) && RxData[0] == 0b00000000){
-        	uint32_t fmi = GetFilterMatchingIndex(&RxHeader);
-        	printf("fmi: %lu \r\n", fmi);
-        	Start_Address = SetFlashSectorForWritingUpdate(fmi);
-        	printf("Start Address: %lX \r\n", Start_Address);
+    	if ((RxHeader.DLC == 1) && (RxData[0] == 0b11111111)){
+//        	uint32_t fmi = GetFilterMatchingIndex(&RxHeader);
+//        	printf("fmi: %lu \r\n", fmi);
+//        	Start_Address = SetFlashSectorForWritingUpdate(fmi);
+//        	printf("Start Address: %lX \r\n", Start_Address);
 
         	/* Prepare the response and send it. */
         	TxHeader.DLC = 1;
         	TxData[0] = 0b11111111;
         	HAL_CAN_AddTxMessage(&hcan1, &TxHeader, TxData, &TxMailbox);
         	printf("response sent \r\n");
+
+    		SystemReset();
     	}
 
-    	/* When it contains actual data, the data is added to a queue to improve robustness. */
     	else{
-    		SystemReset();
+    		printf("Message rejected. \r\n");
     	}
 
 
@@ -502,56 +503,56 @@ void SystemReset(void)
     HAL_NVIC_SystemReset();
 }
 
-static uint32_t GetFilterMatchingIndex(CAN_RxHeaderTypeDef *RxHeader)
-{
-	if (RxHeader->FilterMatchIndex == 0){
-		printf("This is for App0. \r\n");
-	}
-	else if (RxHeader->FilterMatchIndex == 2){
-		printf("This is for App1. \r\n");
-	}
-	else if (RxHeader->FilterMatchIndex == 4){
-			printf("This is for App2. \r\n");
-		}
-	else if (RxHeader->FilterMatchIndex == 6){
-			printf("This is for App3. \r\n");
-		}
-	else if (RxHeader->FilterMatchIndex == 8){
-			printf("This is for App4. \r\n");
-		}
-	else {
-		printf("Rejected. \r\n");
-	}
-
-	return RxHeader->FilterMatchIndex;
-}
-
-static uint32_t SetFlashSectorForWritingUpdate(uint32_t FilterMatchIndex){
-	if (FilterMatchIndex == 0){
-		Start_Address = CUSTOM_SECTION_0;
-		Write_Address = Start_Address;
-	}
-	else if (FilterMatchIndex == 2){
-		Start_Address = CUSTOM_SECTION_1;
-		Write_Address = Start_Address;
-	}
-	else if (FilterMatchIndex == 4){
-		Start_Address = CUSTOM_SECTION_2;
-		Write_Address = Start_Address;
-	}
-	else if (FilterMatchIndex == 6){
-		Start_Address = CUSTOM_SECTION_3;
-		Write_Address = Start_Address;
-	}
-	else if (FilterMatchIndex == 8){
-		Start_Address = CUSTOM_SECTION_4;
-		Write_Address = Start_Address;
-	}
-	else {
-		printf("No Filter Match. \r\n");
-	}
-	return Start_Address;
-}
+//static uint32_t GetFilterMatchingIndex(CAN_RxHeaderTypeDef *RxHeader)
+//{
+//	if (RxHeader->FilterMatchIndex == 0){
+//		printf("This is for App0. \r\n");
+//	}
+//	else if (RxHeader->FilterMatchIndex == 2){
+//		printf("This is for App1. \r\n");
+//	}
+//	else if (RxHeader->FilterMatchIndex == 4){
+//			printf("This is for App2. \r\n");
+//		}
+//	else if (RxHeader->FilterMatchIndex == 6){
+//			printf("This is for App3. \r\n");
+//		}
+//	else if (RxHeader->FilterMatchIndex == 8){
+//			printf("This is for App4. \r\n");
+//		}
+//	else {
+//		printf("Rejected. \r\n");
+//	}
+//
+//	return RxHeader->FilterMatchIndex;
+//}
+//
+//static uint32_t SetFlashSectorForWritingUpdate(uint32_t FilterMatchIndex){
+//	if (FilterMatchIndex == 0){
+//		Start_Address = CUSTOM_SECTION_0;
+//		Write_Address = Start_Address;
+//	}
+//	else if (FilterMatchIndex == 2){
+//		Start_Address = CUSTOM_SECTION_1;
+//		Write_Address = Start_Address;
+//	}
+//	else if (FilterMatchIndex == 4){
+//		Start_Address = CUSTOM_SECTION_2;
+//		Write_Address = Start_Address;
+//	}
+//	else if (FilterMatchIndex == 6){
+//		Start_Address = CUSTOM_SECTION_3;
+//		Write_Address = Start_Address;
+//	}
+//	else if (FilterMatchIndex == 8){
+//		Start_Address = CUSTOM_SECTION_4;
+//		Write_Address = Start_Address;
+//	}
+//	else {
+//		printf("No Filter Match. \r\n");
+//	}
+//	return Start_Address;
+//}
 
 void StopAllThreads(void)
 {
