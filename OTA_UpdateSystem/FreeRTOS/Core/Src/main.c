@@ -431,10 +431,10 @@ void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan)
     if (HAL_CAN_GetRxMessage(hcan, CAN_RX_FIFO0, &RxHeader, RxData) == HAL_OK)
     {
     	printf("Got msg \r\n");
+    	SystemReset();
     }
 
 }
-
 
 /* Enabling a print function for Putty. */
 #ifdef __GNUC__
