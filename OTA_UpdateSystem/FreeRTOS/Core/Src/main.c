@@ -54,7 +54,6 @@
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
-CAN_HandleTypeDef hcan1;
 UART_HandleTypeDef huart3;
 
 /* Definitions for app0 */
@@ -90,14 +89,6 @@ const osThreadAttr_t app3_attributes = {
 
 const uint8_t			APP_Version[2]={MAJOR, MINOR};
 
-// CAN variables
-CAN_RxHeaderTypeDef   	RxHeader;
-CAN_TxHeaderTypeDef   	TxHeader;
-uint8_t               	TxData[8];
-uint8_t               	RxData[8];
-uint32_t              	TxMailbox;
-QueueHandle_t canRxQueue;
-
 // Board status variables
 enum board_status 	  	{NO_UPDATE_AVAILABLE, SENDING_UPDATE, RECEIVING_UPDATE, UPDATE_FINISHED};
 enum board_status 	  	board_status = NO_UPDATE_AVAILABLE;
@@ -115,12 +106,10 @@ uint8_t TxBuffer;
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_USART3_UART_Init(void);
-static void MX_CAN1_Init(void);
-void ShowBoardStatus(void *argument);
+void StartApp0(void *argument);
 void StartApp1(void *argument);
 void StartApp2(void *argument);
 void StartApp3(void *argument);
-void StartApp1_1(void *argument);
 
 /* USER CODE BEGIN PFP */
 void SystemReset(void);
@@ -168,11 +157,8 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_USART3_UART_Init();
-  MX_CAN1_Init();
   /* USER CODE BEGIN 2 */
 
-  /* Start the CAN and enable interrupts*/
- HAL_CAN_Start(&hcan1);
 
 
   /* USER CODE END 2 */
@@ -200,7 +186,7 @@ int main(void)
 
   /* Create the thread(s) */
   /* creation of app0 */
-  app0Handle = osThreadNew(ShowBoardStatus, NULL, &app0_attributes);
+  app0Handle = osThreadNew(StartApp0, NULL, &app0_attributes);
 
   /* creation of app1 */
   app1Handle = osThreadNew(StartApp1, NULL, &app1_attributes);
@@ -286,70 +272,6 @@ void SystemClock_Config(void)
 }
 
 /**
-  * @brief CAN1 Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_CAN1_Init(void)
-{
-
-  /* USER CODE BEGIN CAN1_Init 0 */
-  CAN_FilterTypeDef  sFilterConfig0;
-  /* USER CODE END CAN1_Init 0 */
-
-  /* USER CODE BEGIN CAN1_Init 1 */
-
-  /* USER CODE END CAN1_Init 1 */
-  hcan1.Instance = CAN1;
-  hcan1.Init.Prescaler = 4;
-  hcan1.Init.Mode = CAN_MODE_NORMAL;
-  hcan1.Init.SyncJumpWidth = CAN_SJW_1TQ;
-  hcan1.Init.TimeSeg1 = CAN_BS1_13TQ;
-  hcan1.Init.TimeSeg2 = CAN_BS2_2TQ;
-  hcan1.Init.TimeTriggeredMode = DISABLE;
-  hcan1.Init.AutoBusOff = DISABLE;
-  hcan1.Init.AutoWakeUp = DISABLE;
-  hcan1.Init.AutoRetransmission = ENABLE;
-  hcan1.Init.ReceiveFifoLocked = DISABLE;
-  hcan1.Init.TransmitFifoPriority = DISABLE;
-  if (HAL_CAN_Init(&hcan1) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN CAN1_Init 2 */
-
-  sFilterConfig0.FilterBank = 0;
-  sFilterConfig0.FilterMode = CAN_FILTERMODE_IDMASK;
-  sFilterConfig0.FilterScale = CAN_FILTERSCALE_32BIT;
-  sFilterConfig0.FilterIdHigh = 0x0000;
-  sFilterConfig0.FilterIdLow = 0x0000;
-  sFilterConfig0.FilterMaskIdHigh = 0x0000;
-  sFilterConfig0.FilterMaskIdLow = 0x0000;
-  sFilterConfig0.FilterFIFOAssignment = CAN_RX_FIFO0;
-  sFilterConfig0.FilterActivation = ENABLE;
-  sFilterConfig0.SlaveStartFilterBank = 14;
-  if (HAL_CAN_ConfigFilter(&hcan1, &sFilterConfig0) != HAL_OK) {
-	/* Filter configuration Error */
-	Error_Handler();
-  }
-
-  if (HAL_CAN_Start(&hcan1) != HAL_OK)
-  {
-    /* Start Error */
-    Error_Handler();
-  }
-
-  if (HAL_CAN_ActivateNotification(&hcan1, CAN_IT_RX_FIFO0_MSG_PENDING) != HAL_OK)
-    {
-    /* Notification Error */
-      Error_Handler();
-    }
-
-  /* USER CODE END CAN1_Init 2 */
-
-}
-
-/**
   * @brief USART3 Initialization Function
   * @param None
   * @retval None
@@ -425,7 +347,7 @@ static void MX_GPIO_Init(void)
 
 /* USER CODE BEGIN 4 */
 
-void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan)
+/*void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan)
 {
 	printf("msg callback \r\n");
     // Get the message
@@ -436,7 +358,7 @@ void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan)
         	SystemReset();
     	}
     }
-}
+}*/
 
 /* Enabling a print function for Putty. */
 #ifdef __GNUC__
@@ -526,14 +448,14 @@ void StartApp1_1(void *argument)
 
 /* USER CODE END 4 */
 
-/* USER CODE BEGIN Header_ShowBoardStatus */
+/* USER CODE BEGIN Header_StartApp0 */
 /**
   * @brief  Function implementing the app0 thread.
   * @param  argument: Not used
   * @retval None
   */
-/* USER CODE END Header_ShowBoardStatus */
-void ShowBoardStatus(void *argument)
+/* USER CODE END Header_StartApp0 */
+void StartApp0(void *argument)
 {
   /* USER CODE BEGIN 5 */
   /* Infinite loop */
@@ -569,16 +491,14 @@ void ShowBoardStatus(void *argument)
 /* USER CODE END Header_StartApp1 */
 void StartApp1(void *argument)
 {
+  /* USER CODE BEGIN StartApp1 */
+  /* Infinite loop */
   for(;;)
   {
-
-	  application1();
-	  osDelay(1000);
-
+    osDelay(1);
   }
   /* USER CODE END StartApp1 */
 }
-
 
 /* USER CODE BEGIN Header_StartApp2 */
 /**
@@ -593,7 +513,7 @@ void StartApp2(void *argument)
   /* Infinite loop */
   for(;;)
   {
-	  application2();
+	  printf("hello from freeRTOS1 \r\n");
 	  osDelay(1000);
   }
   /* USER CODE END StartApp2 */

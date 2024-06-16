@@ -83,6 +83,10 @@ UART_HandleTypeDef huart3;
 /* USER CODE BEGIN PV */
 const uint8_t BL_Version[2] = {MAJOR, MINOR};
 
+
+//erase struct
+FLASH_EraseInitTypeDef EraseInitStruct;
+
 // CAN variables
 CAN_RxHeaderTypeDef   	RxHeader;
 CAN_TxHeaderTypeDef   	TxHeader;
@@ -227,10 +231,12 @@ int main(void)
 	  JumpToFreeRTOS();
   }
   else{
-	  TxHeader.DLC = 1;
+
+/*	  TxHeader.DLC = 1;
 	  TxData[0] = 0b11111111;
 	  HAL_CAN_AddTxMessage(&hcan1, &TxHeader, TxData, &TxMailbox);
-	  printf("response sent \r\n");
+	  printf("response sent \r\n");*/
+	  printf("waiting for info \r\n");
   }
 
 
@@ -508,10 +514,7 @@ static void writeInitFlag(uint32_t initFlag){
     HAL_FLASH_Lock();
 }
 
-void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan){
-	printf("Message callback in BL. \r\n");
 
-}
 
 static uint32_t GetFilterMatchingIndex(CAN_RxHeaderTypeDef *RxHeader)
 {
@@ -643,58 +646,61 @@ uint32_t GetSectorSize(uint32_t Sector)
   return sectorsize;
 }
 
-//void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan)
-//{
-//
-//	  /* Preparing some variables */
-//	  uint32_t sector = GetSector(Start_Address);
-//	  uint32_t sectorsize = GetSectorSize(sector);
-//
-//    // Erase the sector only once before writing the data
-//    if (!flashErased)
-//    {
-//        /* Get the 1st sector to erase */
-//        FirstSector = sector;
-//        /* Get the number of sectors to erase */
-//        NbOfSectors = 1; // Assuming only one sector needs to be erased
-//        /* Fill EraseInit structure */
-//        EraseInitStruct.TypeErase     = FLASH_TYPEERASE_SECTORS;
-//        EraseInitStruct.VoltageRange  = FLASH_VOLTAGE_RANGE_3;
-//        EraseInitStruct.Sector        = FirstSector;
-//        EraseInitStruct.NbSectors     = NbOfSectors;
-//
-//        if (HAL_FLASHEx_Erase(&EraseInitStruct, &SECTORError) != HAL_OK)
-//        {
-//            printf("Error erasing flash sector\r\n");
-//            HAL_FLASH_Lock();
-//        }
-//        else
-//        {
-//            printf("Flash sector erased successfully\r\n");
-//            flashErased = true;
-//        }
-//    }
-//    // Get the message
-//    if (HAL_CAN_GetRxMessage(hcan, CAN_RX_FIFO0, &RxHeader, RxData) == HAL_OK)
-//    {
-//    	printf("got msg \r\n");
-//    	Read_Message_and_Write_in_FLASH(Write_Address, Start_Address + sectorsize, RxData, RxHeader.DLC);
-//
-//    }
-//
-//    // Set the update complete flag when the last chunk is received and written
-//    if (Write_Address == Start_Address + sectorsize)
-//    {
-//        updateComplete = true;
-//
-//    }
-//    // Check if update is complete and reset the system
-//    if (updateComplete)
-//    {
-//    	printf("Update completed \r\n");
-//        SystemReset();
-//    }
-//}
+
+void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan)
+{
+
+	printf("I am in call back \r\n");
+
+	  /* Preparing some variables */
+	  uint32_t sector = GetSector(Start_Address);
+	  uint32_t sectorsize = GetSectorSize(sector);
+
+    // Erase the sector only once before writing the data
+    if (!flashErased)
+    {
+        /* Get the 1st sector to erase */
+        FirstSector = sector;
+        /* Get the number of sectors to erase */
+        NbOfSectors = 1; // Assuming only one sector needs to be erased
+        /* Fill EraseInit structure */
+        EraseInitStruct.TypeErase     = FLASH_TYPEERASE_SECTORS;
+        EraseInitStruct.VoltageRange  = FLASH_VOLTAGE_RANGE_3;
+        EraseInitStruct.Sector        = FirstSector;
+        EraseInitStruct.NbSectors     = NbOfSectors;
+
+        if (HAL_FLASHEx_Erase(&EraseInitStruct, &SECTORError) != HAL_OK)
+        {
+            printf("Error erasing flash sector\r\n");
+            HAL_FLASH_Lock();
+        }
+        else
+        {
+            printf("Flash sector erased successfully\r\n");
+            flashErased = true;
+        }
+    }
+    // Get the message
+    if (HAL_CAN_GetRxMessage(hcan, CAN_RX_FIFO0, &RxHeader, RxData) == HAL_OK)
+    {
+    	Read_Message_and_Write_in_FLASH(SECTOR_7_START_ADDRESS, SECTOR_7_START_ADDRESS + SECTOR_7_SIZE, RxData, RxHeader.DLC);
+
+    }
+
+    // Set the update complete flag when the last chunk is received and written
+    if (Write_Address == Start_Address + sectorsize)
+    {
+        updateComplete = true;
+
+    }
+    // Check if update is complete and reset the system
+    if (updateComplete)
+    {
+    	printf("Update completed \r\n");
+        JumpToFreeRTOS();
+    }
+}
+
 
 uint32_t Read_Message_and_Write_in_FLASH(uint32_t Address, uint32_t EndSectorAddress, uint8_t *data, uint8_t length)
 {

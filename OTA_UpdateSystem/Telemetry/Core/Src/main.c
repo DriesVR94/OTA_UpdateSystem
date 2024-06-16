@@ -130,6 +130,8 @@ int main(void)
 
 	  /* Depending on the state of the board, an LED will blink */
 
+	  printf("Hello from telemetry \r\n");
+
 	  if (board_status == READY_FOR_UPDATE){
 		  HAL_GPIO_WritePin(GPIOB, LD2_Pin | LD1_Pin, GPIO_PIN_RESET);
 		  HAL_GPIO_TogglePin(GPIOB, LD3_Pin);   						// Red LED will blink
@@ -345,12 +347,12 @@ static void MX_GPIO_Init(void)
 /* The purpose of this function is to send the TxHeader containing the ID of the message.
  * This ID will be used by the receiver to determine in which flash sector the following message
  * will be stored. This initial message does not contain any useful data. */
-void SendID(){
+/*void SendID(){
 	printf("id sent \r\n");
 	TxHeader.DLC = 1;
 	TxData[0] = 0b11111111;
 	HAL_CAN_AddTxMessage(&hcan1, &TxHeader, TxData, &TxMailbox);
-}
+}*/
 
 /* We will read the full sector. We read a byte each time and pass it to the TxData[i] of the CAN.
  * The maximum amount of data the CAN protocol can send per message is 8 bytes,
@@ -418,16 +420,19 @@ static uint32_t GetSectorSize(uint32_t Sector)
 }
 
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){
-	if (GPIO_Pin == GPIO_PIN_13){
-		SendID();
+	if (GPIO_Pin == GPIO_PIN_13)
+	{
+		TxHeader.DLC = 8;
+		Read_FLASH_and_Prepare_Data_for_CAN(FLASH_SECTOR_7, ADDR_FLASH_SECTOR_7_START);
 	}
 }
 
-void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan)
+/*void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan)
 {
 	  if (HAL_CAN_GetRxMessage(hcan, CAN_RX_FIFO0, &RxHeader, RxData) != HAL_OK)
 	  {
-	    /* Reception Error */
+	     Reception Error
+		  printf("there is a reception error \r\n");
 	    Error_Handler();
 	  }
 	  if ((RxHeader.DLC == 1) && (RxData[0] == 0b11111111)){
@@ -436,7 +441,7 @@ void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan)
 		  //Read_FLASH_and_Prepare_Data_for_CAN(flash_sector, update_storage_sector);
 		  Read_FLASH_and_Prepare_Data_for_CAN(FLASH_SECTOR_6, ADDR_FLASH_SECTOR_6_START);
 	  }
-}
+}*/
 
 
 /* Enabling a print function for Putty. */
