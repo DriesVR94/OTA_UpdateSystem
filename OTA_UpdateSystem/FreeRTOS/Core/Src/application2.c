@@ -13,7 +13,7 @@ void __attribute__((section(".custom_section1"))) application2 (void)
 {
 	int a = 11;
 
-	int b = 6;
+	int b = 7;
 
 	int c = a + b;
 

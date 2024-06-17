@@ -562,12 +562,6 @@ uint32_t Read_Message_and_Write_in_FLASH(uint32_t Address, uint32_t EndSectorAdd
     HAL_FLASH_Unlock();
     //printf("Flash unlocked\r\n");
     board_status = RECEIVING_UPDATE;
-    if (!appdeleted)
-    {
-    	vTaskDelete(app2Handle);
-    	appdeleted = true;
-    }
-
 
     for (uint8_t i = 0; i < length; i++)
     {
@@ -581,7 +575,7 @@ uint32_t Read_Message_and_Write_in_FLASH(uint32_t Address, uint32_t EndSectorAdd
         HAL_StatusTypeDef flash_status = HAL_FLASH_Program(FLASH_TYPEPROGRAM_BYTE, Address, data[i]);
         if (flash_status == HAL_OK)
         {
-            //printf("Flash write successful: %02X at address %lu\r\n", data[i], Address);
+            printf("Flash write successful: %02X at address %lu\r\n", data[i], Address);
             Address++;
         }
         else
@@ -627,7 +621,7 @@ void CANRxTask(void *argument)
         {
 
             // Erase the sector only once before writing the data
-/*            if (!flashErased)
+           if (!flashErased)
             {
                 //First we delete thread of app1
                 printf("Deleting App2 thread");
@@ -637,11 +631,11 @@ void CANRxTask(void *argument)
                 // Set the handle to NULL to indicate the task is deleted
                 app1Handle = NULL;
 
-                 Get the 1st sector to erase
+                 //Get the 1st sector to erase
                 FirstSector = GetSector(Address);
-                 Get the number of sectors to erase
+                 //Get the number of sectors to erase
                 NbOfSectors = 1; // Assuming only one sector needs to be erased
-                 Fill EraseInit structure
+                 //Fill EraseInit structure
                 EraseInitStruct.TypeErase     = FLASH_TYPEERASE_SECTORS;
                 EraseInitStruct.VoltageRange  = FLASH_VOLTAGE_RANGE_3;
                 EraseInitStruct.Sector        = FirstSector;
@@ -657,14 +651,14 @@ void CANRxTask(void *argument)
                     printf("Flash sector erased successfully\r\n");
                     flashErased = true;
                 }
-            }*/
+            }
 
             // Call the function to write to FLASH and update the address
             Address = Read_Message_and_Write_in_FLASH(Address, FLASH_USER_END_ADDR_RX, pRxData, pRxHeader->DLC);
 
 
             // Set the update complete flag when the last chunk is received and written
-            if (Address >= FLASH_USER_START_ADDR_RX + 601)
+            if (Address >= FLASH_USER_START_ADDR_RX + 600)
             {
                 updateComplete = true;
 
@@ -674,8 +668,8 @@ void CANRxTask(void *argument)
         // Check if update is complete and reset the system
         if (updateComplete)
         {
-        	printf("Update completed \r\n");
-            //osDelay(3000);    //Safety delay for launching it
+        	printf("Update completed ...............................................\r\n");
+            osDelay(3000);    //Safety delay for launching it
 
 //            printf("Cerating a new task \r\n");
 //            osThreadNew(StartApp1_1, NULL, &app1_1_attributes);
