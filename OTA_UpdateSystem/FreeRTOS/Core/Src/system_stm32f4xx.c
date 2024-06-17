@@ -91,7 +91,10 @@
 /*!< Uncomment the following line if you need to relocate the vector table
      anywhere in Flash or Sram, else the vector table is kept at the automatic
      remap of boot address selected */
-#define USER_VECT_TAB_ADDRESS */
+#define USER_VECT_TAB_ADDRESS
+
+#define SECOND_FREERTOS_FLAG_ADDRESS	0x0805FFFC
+#define SECOND_FREERTOS_FLAG_VALUE		0xBBBBBBBB
 
 #if defined(USER_VECT_TAB_ADDRESS)
 /*!< Uncomment the following line if you need to relocate your vector Table
@@ -107,6 +110,7 @@
                                                      This value must be a multiple of 0x200. */
 #define VECT_TAB_OFFSET         0x00060000U     /*!< Vector Table base offset field.
                                                      This value must be a multiple of 0x200. */
+#define VECT_TAB_OFFSET_2		0x00008000U
 #endif /* VECT_TAB_SRAM */
 #endif /* USER_VECT_TAB_ADDRESS */
 /******************************************************************************/
@@ -176,8 +180,19 @@ void SystemInit(void)
 #endif /* DATA_IN_ExtSRAM || DATA_IN_ExtSDRAM */
 
   /* Configure the Vector Table location -------------------------------------*/
+
+uint32_t checkInitFlag(){
+	return *(uint32_t*)SECOND_FREERTOS_FLAG_ADDRESS;
+}
+
 #if defined(USER_VECT_TAB_ADDRESS)
-  SCB->VTOR = VECT_TAB_BASE_ADDRESS | VECT_TAB_OFFSET; /* Vector Table Relocation in Internal SRAM */
+  uint32_t secondFreeRTOSFlag = checkInitFlag();
+  if (secondFreeRTOSFlag != SECOND_FREERTOS_FLAG_VALUE){
+	  SCB->VTOR = VECT_TAB_BASE_ADDRESS | VECT_TAB_OFFSET; /* Vector Table Relocation in Internal SRAM */
+  }
+  else {
+	  SCB->VTOR = VECT_TAB_BASE_ADDRESS | VECT_TAB_OFFSET_2; /* Vector Table Relocation in Internal SRAM */
+  }
 #endif /* USER_VECT_TAB_ADDRESS */
 }
 

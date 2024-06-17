@@ -4,6 +4,9 @@
 #metadata
 .metadata/
 
+#files
+Backup_versions/
+
 #Debug
 Debug/
 debug/

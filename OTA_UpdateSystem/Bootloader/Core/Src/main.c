@@ -31,7 +31,8 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-
+#define INITIALIZATION_FLAG_ADDRESS	0x0805FFFC
+#define INITIALIZATION_FLAG_VALUE 	0xBBBBBBBB
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -78,7 +79,10 @@ static void MX_GPIO_Init(void);
 static void MX_USART3_UART_Init(void);
 static void MX_SPI1_Init(void);
 /* USER CODE BEGIN PFP */
-static void goto_application( void );
+static void JumpToFreeRTOS( void );
+static void JumpToUpdate( void );
+void SystemReset(void);
+static uint32_t checkInitFlag(void);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -169,8 +173,14 @@ int main(void)
   printf("Sector 7 part 2 copied\r\n");
 
 
-
-  goto_application();
+  printf("initflag: %lX \r\n", checkInitFlag());
+  if (checkInitFlag() != INITIALIZATION_FLAG_VALUE){
+	  //writeInitFlag(INITIALIZATION_FLAG_VALUE);
+	  JumpToFreeRTOS();
+  }
+  else{
+	  JumpToUpdate();
+  }
 
   /* USER CODE END 2 */
 
@@ -352,15 +362,37 @@ int fputc(int ch, FILE *f)
 
 
 
-static void goto_application (void)
+static void JumpToFreeRTOS(void)
 {
-	printf("Gonna Jump to Application \n");
+	printf("Gonna Jump to FreeRTOS \r\n");
 
 	void (*app_reset_handler)(void) = (void*) ( *(volatile uint32_t *)(0x08060000 +4));
 
 	HAL_GPIO_WritePin( GPIOB, GPIO_PIN_0, GPIO_PIN_RESET);
 
 	app_reset_handler(); //call the app reset handler
+}
+
+static void JumpToUpdate(void)
+{
+	printf("Gonna Jump to Update \r\n");
+
+	void (*app_reset_handler)(void) = (void*) ( *(volatile uint32_t *)(0x08008000 +4));
+
+	HAL_GPIO_WritePin( GPIOB, GPIO_PIN_0, GPIO_PIN_RESET);
+
+	app_reset_handler(); //call the app reset handler
+}
+
+static uint32_t checkInitFlag(){
+	return *(uint32_t*)INITIALIZATION_FLAG_ADDRESS;
+}
+
+// Function to trigger a system reset
+void SystemReset(void)
+{
+    printf("System resetting...\r\n");
+    HAL_NVIC_SystemReset();
 }
 
 /* USER CODE END 4 */

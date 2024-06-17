@@ -51,7 +51,7 @@ MEMORY
   
   /* Custom applications */
   /* We reserved flash sectors 0 and 1 for the bootloader. */
-  CUSTOM_SECTION_0 	(rx)	: ORIGIN = 0x08008000,		LENGTH = 16K	/* Flash sector 2 */
+  /*CUSTOM_SECTION_0 	(rx)	: ORIGIN = 0x08008000,		LENGTH = 16K	/* Flash sector 2 */
   CUSTOM_SECTION_1 	(rx)	: ORIGIN = 0x0800C000,		LENGTH = 16K	/* Flash sector 3 */
   CUSTOM_SECTION_2 	(rx)	: ORIGIN = 0x08010000,		LENGTH = 64K	/* Flash sector 4 */
   CUSTOM_SECTION_3	(rx)	: ORIGIN = 0x08020000,		LENGTH = 128K	/* Flash sector 5 */
@@ -64,10 +64,6 @@ SECTIONS
 {
 
   /* Custom section for applications */
-  .custom_section0 :
-  {
-    *(.custom_section0)
-  } > CUSTOM_SECTION_0
 
   .custom_section1 :
   {

@@ -43,12 +43,11 @@
  * One board simulates the telemetry module (= responsible from communication with the ground station) on a CubeSat,
  * the other board simulates the on-board computer (OBC) of the CubeSat. */
 
-#define FLASH_USER_START_ADDR_RX   ADDR_FLASH_SECTOR_5_START		/* Start @ of user Flash area */
-#define FLASH_USER_END_ADDR_RX     ADDR_FLASH_SECTOR_5_END 			/* End @ of user Flash area */
+#define FLASH_USER_START_ADDR_RX   ADDR_FLASH_SECTOR_2_START		/* Start @ of user Flash area */
+#define FLASH_USER_END_ADDR_RX     ADDR_FLASH_SECTOR_2_END 			/* End @ of user Flash area */
 
-#define APPLICATION_START_ADDR      0x8000000
-
-#define DATA_32                    ((uint32_t)0x12345678)
+#define INITIALIZATION_FLAG_ADDRESS	0x0805FFFC
+#define INITIALIZATION_FLAG_VALUE 	0xBBBBBBBB
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -145,6 +144,8 @@ void RebootToApplication(void);
 uint32_t GetSector(uint32_t Address);
 uint32_t GetSectorSize(uint32_t Sector);
 uint32_t Read_Message_and_Write_in_FLASH(uint32_t StartSectorAddress, uint32_t EndSectorAddress, uint8_t *data, uint8_t length);
+static void writeInitFlag(uint32_t initFlag);
+
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -453,6 +454,15 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
+static void writeInitFlag(uint32_t initFlag){
+	HAL_FLASH_Unlock();
+
+    if (HAL_FLASH_Program(TYPEPROGRAM_WORD, INITIALIZATION_FLAG_ADDRESS, initFlag) != HAL_OK) {
+        // Error handling
+    	printf("Flag program error. \r\n");
+    }
+    HAL_FLASH_Lock();
+}
 
 /**
   * @brief  Gets the sector of a given address
@@ -585,7 +595,7 @@ uint32_t Read_Message_and_Write_in_FLASH(uint32_t Address, uint32_t EndSectorAdd
         }
     }
 
-    printf("Address %lu\r\n", Address);
+    printf("Address: %lX\r\n", Address);
     HAL_FLASH_Lock();
     //printf("Flash locked\r\n");
 
@@ -606,12 +616,12 @@ void CANRxTask(void *argument)
     uint32_t sector = GetSector(FLASH_USER_START_ADDR_RX);
     uint32_t sectorsize = GetSectorSize(sector);
 
-    // Declare the app1_1_attributes at the beginning of the function
-    osThreadAttr_t app1_1_attributes = {
-        .name = "app1.1",
-        .stack_size = 128 * 4,
-        .priority = (osPriority_t) osPriorityLow,
-    };
+//    // Declare the app1_1_attributes at the beginning of the function
+//    osThreadAttr_t app1_1_attributes = {
+//        .name = "app1.1",
+//        .stack_size = 128 * 4,
+//        .priority = (osPriority_t) osPriorityLow,
+//    };
 
     while (1)
     {
@@ -622,8 +632,9 @@ void CANRxTask(void *argument)
             // Erase the sector only once before writing the data
             if (!flashErased)
             {
+            	writeInitFlag(INITIALIZATION_FLAG_VALUE);
                 //First we delete thread of app1
-                printf("Deleting App1 thread");
+                printf("Erasing \r\n");
 
                 // Delete this task (app1) after the flag is set, indicating an update
                 vTaskDelete(app1Handle);
@@ -759,7 +770,7 @@ void StartApp1(void *argument)
   for(;;)
   {
 
-	  application1();
+	  //application1();
 	  osDelay(1000);
 
   }
