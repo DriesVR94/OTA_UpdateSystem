@@ -11,6 +11,12 @@
 
 void __attribute__((section(".custom_section1"))) application2 (void)
 {
-	printf("in app 2 \r\n");
+	int a = 11;
+
+	int b = 6;
+
+	int c = a + b;
+
+
 }
 

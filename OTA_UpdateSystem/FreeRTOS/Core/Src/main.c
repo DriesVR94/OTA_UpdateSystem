@@ -43,8 +43,8 @@
  * One board simulates the telemetry module (= responsible from communication with the ground station) on a CubeSat,
  * the other board simulates the on-board computer (OBC) of the CubeSat. */
 
-#define FLASH_USER_START_ADDR_RX   ADDR_FLASH_SECTOR_5_START		/* Start @ of user Flash area */
-#define FLASH_USER_END_ADDR_RX     ADDR_FLASH_SECTOR_5_END 			/* End @ of user Flash area */
+#define FLASH_USER_START_ADDR_RX   ADDR_FLASH_SECTOR_3_START		/* Start @ of user Flash area */
+#define FLASH_USER_END_ADDR_RX     ADDR_FLASH_SECTOR_3_END 			/* End @ of user Flash area */
 
 #define APPLICATION_START_ADDR      0x8000000
 
@@ -120,6 +120,7 @@ bool flashErased = false;  // Add this line to declare the flashErased variable
 bool updateComplete = false;
 bool taskCreated = false;
 bool flag1;
+bool appdeleted;
 
 /* USER CODE END PV */
 
@@ -561,6 +562,12 @@ uint32_t Read_Message_and_Write_in_FLASH(uint32_t Address, uint32_t EndSectorAdd
     HAL_FLASH_Unlock();
     //printf("Flash unlocked\r\n");
     board_status = RECEIVING_UPDATE;
+    if (!appdeleted)
+    {
+    	vTaskDelete(app2Handle);
+    	appdeleted = true;
+    }
+
 
     for (uint8_t i = 0; i < length; i++)
     {
@@ -620,21 +627,21 @@ void CANRxTask(void *argument)
         {
 
             // Erase the sector only once before writing the data
-            if (!flashErased)
+/*            if (!flashErased)
             {
                 //First we delete thread of app1
-                printf("Deleting App1 thread");
+                printf("Deleting App2 thread");
 
                 // Delete this task (app1) after the flag is set, indicating an update
-                vTaskDelete(app1Handle);
+                vTaskDelete(app2Handle);
                 // Set the handle to NULL to indicate the task is deleted
                 app1Handle = NULL;
 
-                /* Get the 1st sector to erase */
+                 Get the 1st sector to erase
                 FirstSector = GetSector(Address);
-                /* Get the number of sectors to erase */
+                 Get the number of sectors to erase
                 NbOfSectors = 1; // Assuming only one sector needs to be erased
-                /* Fill EraseInit structure */
+                 Fill EraseInit structure
                 EraseInitStruct.TypeErase     = FLASH_TYPEERASE_SECTORS;
                 EraseInitStruct.VoltageRange  = FLASH_VOLTAGE_RANGE_3;
                 EraseInitStruct.Sector        = FirstSector;
@@ -650,14 +657,14 @@ void CANRxTask(void *argument)
                     printf("Flash sector erased successfully\r\n");
                     flashErased = true;
                 }
-            }
+            }*/
 
             // Call the function to write to FLASH and update the address
             Address = Read_Message_and_Write_in_FLASH(Address, FLASH_USER_END_ADDR_RX, pRxData, pRxHeader->DLC);
 
 
             // Set the update complete flag when the last chunk is received and written
-            if (Address == FLASH_USER_START_ADDR_RX + sectorsize)
+            if (Address >= FLASH_USER_START_ADDR_RX + 601)
             {
                 updateComplete = true;
 
@@ -697,17 +704,6 @@ void StopAllThreads(void)
 }
 
 
-void StartApp1_1(void *argument)
-{
-  for(;;)
-  {
-      //printf("Hello from app 1.1\r\n");
-
-	  printf("About to try to relaunch with a new task \r\n");
-      //application1();
-      osDelay(1000);
-  }
-}
 
 
 
@@ -780,8 +776,10 @@ void StartApp2(void *argument)
   /* Infinite loop */
   for(;;)
   {
+
+	  osDelay(2000);
+	  printf("launching application 2 \r\n");
 	  application2();
-	  osDelay(1000);
   }
   /* USER CODE END StartApp2 */
 }

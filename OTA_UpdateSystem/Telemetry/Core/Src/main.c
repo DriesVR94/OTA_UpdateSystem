@@ -38,8 +38,8 @@
  * One board simulates the telemetry module (= responsible from communication with the ground station) on a CubeSat,
  * the other board simulates the on-board computer (OBC) of the CubeSat. */
 
-#define FLASH_USER_START_ADDR_TX   ADDR_FLASH_SECTOR_7_START		/* Start @ of user Flash area */
-#define FLASH_USER_END_ADDR_TX     ADDR_FLASH_SECTOR_7_END 			/* End @ of user Flash area */
+#define FLASH_USER_START_ADDR_TX   ADDR_FLASH_SECTOR_3_START		/* Start @ of user Flash area */
+#define FLASH_USER_END_ADDR_TX     ADDR_FLASH_SECTOR_3_END 			/* End @ of user Flash area */
 
 /* USER CODE END PD */
 
@@ -353,9 +353,9 @@ void Read_FLASH_and_Prepare_Data_for_CAN(uint32_t Sector, uint32_t StartSectorAd
 	/* Unlock the Flash to enable the flash control register access. */
 	HAL_FLASH_Unlock();
 	/* Since sectors can have different length, we need to calculate how many bytes need to be read. */
-	uint32_t nrOfBytes = GetSectorSize(Sector);
+	uint32_t nrOfBytes = 600;
 
- 	while (nrOfBytes != 0){
+ 	while (nrOfBytes >= 0 && nrOfBytes<=1000){
  		HAL_GPIO_TogglePin(GPIOB, LD2_Pin);
  		for (int i = 0; i < 8; i++){
  			/* Read the first byte from Flash and store it in TxBuffer. */
@@ -410,7 +410,8 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){
 	if (GPIO_Pin == GPIO_PIN_13){
 
 		// Start reading the Flash sector where we stored the .bin file of the update.
-		Read_FLASH_and_Prepare_Data_for_CAN(FLASH_SECTOR_7, FLASH_USER_START_ADDR_TX);
+		Read_FLASH_and_Prepare_Data_for_CAN(FLASH_SECTOR_3, FLASH_USER_START_ADDR_TX);
+		HAL_Delay(1000);
 	}
 }
 
