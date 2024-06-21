@@ -43,8 +43,8 @@
  * One board simulates the telemetry module (= responsible from communication with the ground station) on a CubeSat,
  * the other board simulates the on-board computer (OBC) of the CubeSat. */
 
-#define FLASH_USER_START_ADDR_RX   ADDR_FLASH_SECTOR_5_START		/* Start @ of user Flash area */
-#define FLASH_USER_END_ADDR_RX     ADDR_FLASH_SECTOR_5_END 			/* End @ of user Flash area */
+#define FLASH_USER_START_ADDR_RX   ADDR_FLASH_SECTOR_6_START		/* Start @ of user Flash area */
+#define FLASH_USER_END_ADDR_RX     ADDR_FLASH_SECTOR_6_END 			/* End @ of user Flash area */
 
 #define APPLICATION_START_ADDR      0x8000000
 
@@ -657,7 +657,7 @@ void CANRxTask(void *argument)
 
 
             // Set the update complete flag when the last chunk is received and written
-            if (Address == FLASH_USER_START_ADDR_RX + sectorsize)
+            if (Address == FLASH_USER_END_ADDR_RX)
             {
                 updateComplete = true;
 
