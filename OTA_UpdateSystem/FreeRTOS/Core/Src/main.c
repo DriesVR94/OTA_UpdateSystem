@@ -43,8 +43,8 @@
  * One board simulates the telemetry module (= responsible from communication with the ground station) on a CubeSat,
  * the other board simulates the on-board computer (OBC) of the CubeSat. */
 
-#define FLASH_USER_START_ADDR_RX   ADDR_FLASH_SECTOR_2_START		/* Start @ of user Flash area */
-#define FLASH_USER_END_ADDR_RX     ADDR_FLASH_SECTOR_2_END 			/* End @ of user Flash area */
+#define FLASH_USER_START_ADDR_RX   ADDR_FLASH_SECTOR_6_START		/* Start @ of user Flash area */
+#define FLASH_USER_END_ADDR_RX     ADDR_FLASH_SECTOR_6_END 			/* End @ of user Flash area */
 
 #define INITIALIZATION_FLAG_ADDRESS	0x0805FFFC
 #define INITIALIZATION_FLAG_VALUE 	0xBBBBBBBB
@@ -553,7 +553,6 @@ void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan)
 
 /* Enabling a print function for Putty. */
 #ifdef __GNUC__
-
  /* With GCC, small printf (option LD Linker->Libraries->Small printf set to 'Yes') calls __io_putchar() */
 int __io_putchar(int ch)
 #else
@@ -668,7 +667,7 @@ void CANRxTask(void *argument)
 
 
             // Set the update complete flag when the last chunk is received and written
-            if (Address == FLASH_USER_START_ADDR_RX + sectorsize)
+            if (Address == FLASH_USER_END_ADDR_RX)
             {
                 updateComplete = true;
 

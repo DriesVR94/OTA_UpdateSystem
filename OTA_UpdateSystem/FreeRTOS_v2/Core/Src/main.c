@@ -18,6 +18,7 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "cmsis_os.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -31,58 +32,47 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define INITIALIZATION_FLAG_ADDRESS	0x0805FFFC
-#define INITIALIZATION_FLAG_VALUE 	0xBBBBBBBB
+
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
 /* USER CODE BEGIN PM */
-#define MAJOR 0
-#define MINOR 1
-
-
-#define SECTOR_2_START_ADDRESS 0x08008000  // Starting address of sector 2
-#define SECTOR_2_SIZE 0x4000               // Size of sector 2 (16KB)
-
-#define SECTOR_3_START_ADDRESS 0x0800C000  // Starting address of sector 3
-#define SECTOR_3_SIZE 0x4000               // Size of sector 3 (16KB)
-
-#define SECTOR_4_START_ADDRESS 0x08010000  // Starting address of sector 4
-#define SECTOR_4_SIZE 0x10000               // Size of sector 4 (64KB)
-
-#define SECTOR_5_START_ADDRESS 0x08020000  // Starting address of sector 5
-#define SECTOR_5_SIZE 0x20000               // Size of sector 5 (128KB)
-
-#define SECTOR_6_START_ADDRESS 0x08040000  // Starting address of sector 6
-#define SECTOR_6_SIZE 0x20000            // Size of sector 6 (128KB)
-
-
-#define SECTOR_7_START_ADDRESS 0x08060000  // Starting address of sector 7 FREERTOS SECTOR
-#define SECTOR_7_SIZE 0x20000            // Size of sector 7 (128KB)
-
-
 
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
-SPI_HandleTypeDef hspi1;
+CAN_HandleTypeDef hcan1;
 
 UART_HandleTypeDef huart3;
 
+/* Definitions for App1 */
+osThreadId_t App1Handle;
+const osThreadAttr_t App1_attributes = {
+  .name = "App1",
+  .stack_size = 128 * 4,
+  .priority = (osPriority_t) osPriorityNormal,
+};
+/* Definitions for App2 */
+osThreadId_t App2Handle;
+const osThreadAttr_t App2_attributes = {
+  .name = "App2",
+  .stack_size = 128 * 4,
+  .priority = (osPriority_t) osPriorityLow,
+};
 /* USER CODE BEGIN PV */
-const uint8_t BL_Version[2] = {MAJOR, MINOR};
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
+static void MX_CAN1_Init(void);
 static void MX_USART3_UART_Init(void);
-static void MX_SPI1_Init(void);
+void StartApp1(void *argument);
+void StartApp2(void *argument);
+
 /* USER CODE BEGIN PFP */
-static void JumpToFreeRTOS( void );
-static void JumpToUpdate( void );
-void SystemReset(void);
-static uint32_t checkInitFlag(void);
+
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -119,70 +109,50 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
+  MX_CAN1_Init();
   MX_USART3_UART_Init();
-  MX_SPI1_Init();
   /* USER CODE BEGIN 2 */
 
-  //STARTING message
-  printf("Starting Bootloader (%d.%d)\r\n", BL_Version[0], BL_Version[1]);
-  HAL_GPIO_WritePin( GPIOB, GPIO_PIN_0,GPIO_PIN_SET);
-  HAL_Delay(2000);
-
-
-  //flash init
-
-  if(!Flash_Init())
-  {
-	  printf("It does not init \r\n");
-  }
-
-
-  // We perform a safety coppy of all the sectors in external SPI memory
-  uint8_t *ptr1 = (uint8_t *)SECTOR_2_START_ADDRESS; //
-  SPI_Flash_Write(0x90008000 ,ptr1,SECTOR_2_SIZE);
-  printf("Sector 2 coppied\r\n");
-
-  ptr1 = (uint8_t *)SECTOR_3_START_ADDRESS; //
-  SPI_Flash_Write(0x9000C000,ptr1,SECTOR_3_SIZE);
-  printf("Sector 3 coppied\r\n");
-
-  ptr1 = (uint8_t *)SECTOR_4_START_ADDRESS; //
-  SPI_Flash_Write(0x90010000,ptr1,SECTOR_4_SIZE);
-  printf("Sector 4 coppied\r\n");
-
-
-  // Copy sector 5 in two rounds of 64KB each
-  ptr1 = (uint8_t *)SECTOR_5_START_ADDRESS;
-  SPI_Flash_Write(0x90020000, ptr1, 0x10000);  // First 64KB
-  printf("Sector 5 part 1 copied\r\n");
-  SPI_Flash_Write(0x90030000, ptr1 + 0x10000, 0x10000);  // Second 64KB
-  printf("Sector 5 part 2 copied\r\n");
-
-  // Copy sector 6 in two rounds of 64KB each
-  ptr1 = (uint8_t *)SECTOR_6_START_ADDRESS;
-  SPI_Flash_Write(0x90040000, ptr1, 0x10000);  // First 64KB
-  printf("Sector 6 part 1 copied\r\n");
-  SPI_Flash_Write(0x90050000, ptr1 + 0x10000, 0x10000);  // Second 64KB
-  printf("Sector 6 part 2 copied\r\n");
-
-  // Copy sector 7 in two rounds of 64KB each			RTOS INSIDE
-  ptr1 = (uint8_t *)SECTOR_7_START_ADDRESS;
-  SPI_Flash_Write(0x90060000, ptr1, 0x10000);  // First 64KB
-  printf("Sector 7 part 1 copied\r\n");
-  SPI_Flash_Write(0x90070000, ptr1 + 0x10000, 0x10000);  // Second 64KB
-  printf("Sector 7 part 2 copied\r\n");
-
-
-  printf("initflag: %lX \r\n", checkInitFlag());
-  if (checkInitFlag() != INITIALIZATION_FLAG_VALUE){
-	  //writeInitFlag(INITIALIZATION_FLAG_VALUE);
-	  JumpToFreeRTOS();
-  }
-  else{
-	  JumpToUpdate();
-  }
-
   /* USER CODE END 2 */
+
+  /* Init scheduler */
+  osKernelInitialize();
+
+  /* USER CODE BEGIN RTOS_MUTEX */
+  /* add mutexes, ... */
+  /* USER CODE END RTOS_MUTEX */
+
+  /* USER CODE BEGIN RTOS_SEMAPHORES */
+  /* add semaphores, ... */
+  /* USER CODE END RTOS_SEMAPHORES */
+
+  /* USER CODE BEGIN RTOS_TIMERS */
+  /* start timers, add new ones, ... */
+  /* USER CODE END RTOS_TIMERS */
+
+  /* USER CODE BEGIN RTOS_QUEUES */
+  /* add queues, ... */
+  /* USER CODE END RTOS_QUEUES */
+
+  /* Create the thread(s) */
+  /* creation of App1 */
+  App1Handle = osThreadNew(StartApp1, NULL, &App1_attributes);
+
+  /* creation of App2 */
+  App2Handle = osThreadNew(StartApp2, NULL, &App2_attributes);
+
+  /* USER CODE BEGIN RTOS_THREADS */
+  /* add threads, ... */
+  /* USER CODE END RTOS_THREADS */
+
+  /* USER CODE BEGIN RTOS_EVENTS */
+  /* add events, ... */
+  /* USER CODE END RTOS_EVENTS */
+
+  /* Start scheduler */
+  osKernelStart();
+
+  /* We should never get here as control is now taken by the scheduler */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
@@ -215,7 +185,13 @@ void SystemClock_Config(void)
   RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI;
   RCC_OscInitStruct.HSIState = RCC_HSI_ON;
   RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
-  RCC_OscInitStruct.PLL.PLLState = RCC_PLL_NONE;
+  RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
+  RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSI;
+  RCC_OscInitStruct.PLL.PLLM = 8;
+  RCC_OscInitStruct.PLL.PLLN = 84;
+  RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV2;
+  RCC_OscInitStruct.PLL.PLLQ = 2;
+  RCC_OscInitStruct.PLL.PLLR = 2;
   if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
   {
     Error_Handler();
@@ -225,52 +201,51 @@ void SystemClock_Config(void)
   */
   RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
                               |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
-  RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_HSI;
+  RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
   RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
   RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV2;
   RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
 
-  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_0) != HAL_OK)
+  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2) != HAL_OK)
   {
     Error_Handler();
   }
 }
 
 /**
-  * @brief SPI1 Initialization Function
+  * @brief CAN1 Initialization Function
   * @param None
   * @retval None
   */
-static void MX_SPI1_Init(void)
+static void MX_CAN1_Init(void)
 {
 
-  /* USER CODE BEGIN SPI1_Init 0 */
+  /* USER CODE BEGIN CAN1_Init 0 */
 
-  /* USER CODE END SPI1_Init 0 */
+  /* USER CODE END CAN1_Init 0 */
 
-  /* USER CODE BEGIN SPI1_Init 1 */
+  /* USER CODE BEGIN CAN1_Init 1 */
 
-  /* USER CODE END SPI1_Init 1 */
-  /* SPI1 parameter configuration*/
-  hspi1.Instance = SPI1;
-  hspi1.Init.Mode = SPI_MODE_MASTER;
-  hspi1.Init.Direction = SPI_DIRECTION_2LINES;
-  hspi1.Init.DataSize = SPI_DATASIZE_8BIT;
-  hspi1.Init.CLKPolarity = SPI_POLARITY_LOW;
-  hspi1.Init.CLKPhase = SPI_PHASE_1EDGE;
-  hspi1.Init.NSS = SPI_NSS_SOFT;
-  hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_2;
-  hspi1.Init.FirstBit = SPI_FIRSTBIT_MSB;
-  hspi1.Init.TIMode = SPI_TIMODE_DISABLE;
-  hspi1.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
-  hspi1.Init.CRCPolynomial = 10;
-  if (HAL_SPI_Init(&hspi1) != HAL_OK)
+  /* USER CODE END CAN1_Init 1 */
+  hcan1.Instance = CAN1;
+  hcan1.Init.Prescaler = 4;
+  hcan1.Init.Mode = CAN_MODE_NORMAL;
+  hcan1.Init.SyncJumpWidth = CAN_SJW_1TQ;
+  hcan1.Init.TimeSeg1 = CAN_BS1_13TQ;
+  hcan1.Init.TimeSeg2 = CAN_BS2_2TQ;
+  hcan1.Init.TimeTriggeredMode = DISABLE;
+  hcan1.Init.AutoBusOff = DISABLE;
+  hcan1.Init.AutoWakeUp = DISABLE;
+  hcan1.Init.AutoRetransmission = DISABLE;
+  hcan1.Init.ReceiveFifoLocked = DISABLE;
+  hcan1.Init.TransmitFifoPriority = DISABLE;
+  if (HAL_CAN_Init(&hcan1) != HAL_OK)
   {
     Error_Handler();
   }
-  /* USER CODE BEGIN SPI1_Init 2 */
+  /* USER CODE BEGIN CAN1_Init 2 */
 
-  /* USER CODE END SPI1_Init 2 */
+  /* USER CODE END CAN1_Init 2 */
 
 }
 
@@ -314,42 +289,21 @@ static void MX_USART3_UART_Init(void)
   */
 static void MX_GPIO_Init(void)
 {
-  GPIO_InitTypeDef GPIO_InitStruct = {0};
 /* USER CODE BEGIN MX_GPIO_Init_1 */
 /* USER CODE END MX_GPIO_Init_1 */
 
   /* GPIO Ports Clock Enable */
-  __HAL_RCC_GPIOA_CLK_ENABLE();
-  __HAL_RCC_GPIOB_CLK_ENABLE();
   __HAL_RCC_GPIOD_CLK_ENABLE();
-
-  /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0, GPIO_PIN_RESET);
-
-  /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(FLASH_CS_GPIO_Port, FLASH_CS_Pin, GPIO_PIN_SET);
-
-  /*Configure GPIO pin : PB0 */
-  GPIO_InitStruct.Pin = GPIO_PIN_0;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
-
-  /*Configure GPIO pin : FLASH_CS_Pin */
-  GPIO_InitStruct.Pin = FLASH_CS_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
-  HAL_GPIO_Init(FLASH_CS_GPIO_Port, &GPIO_InitStruct);
+  __HAL_RCC_GPIOA_CLK_ENABLE();
 
 /* USER CODE BEGIN MX_GPIO_Init_2 */
 /* USER CODE END MX_GPIO_Init_2 */
 }
 
 /* USER CODE BEGIN 4 */
-#ifdef __GNUC__
 
+/* Enabling a print function for Putty. */
+#ifdef __GNUC__
  /* With GCC, small printf (option LD Linker->Libraries->Small printf set to 'Yes') calls __io_putchar() */
 int __io_putchar(int ch)
 #else
@@ -360,42 +314,66 @@ int fputc(int ch, FILE *f)
 	return ch;
 }
 
-
-
-static void JumpToFreeRTOS(void)
-{
-	printf("Jumping to FreeRTOS \r\n");
-
-	void (*app_reset_handler)(void) = (void*) ( *(volatile uint32_t *)(0x08060000 +4));
-
-	HAL_GPIO_WritePin( GPIOB, GPIO_PIN_0, GPIO_PIN_RESET);
-
-	app_reset_handler(); //call the app reset handler
-}
-
-static void JumpToUpdate(void)
-{
-	printf("Jumping to Update \r\n");
-
-	void (*app_reset_handler)(void) = (void*) ( *(volatile uint32_t *)(0x08040000 +4));
-
-	HAL_GPIO_WritePin( GPIOB, GPIO_PIN_0, GPIO_PIN_RESET);
-
-	app_reset_handler(); //call the app reset handler
-}
-
-static uint32_t checkInitFlag(){
-	return *(uint32_t*)INITIALIZATION_FLAG_ADDRESS;
-}
-
-// Function to trigger a system reset
-void SystemReset(void)
-{
-    printf("System resetting...\r\n");
-    HAL_NVIC_SystemReset();
-}
-
 /* USER CODE END 4 */
+
+/* USER CODE BEGIN Header_StartApp1 */
+/**
+  * @brief  Function implementing the App1 thread.
+  * @param  argument: Not used
+  * @retval None
+  */
+/* USER CODE END Header_StartApp1 */
+void StartApp1(void *argument)
+{
+  /* USER CODE BEGIN 5 */
+  /* Infinite loop */
+  for(;;)
+  {
+	  printf("Hello from The new App 1 \r\n");
+	  osDelay(1000);
+  }
+  /* USER CODE END 5 */
+}
+
+/* USER CODE BEGIN Header_StartApp2 */
+/**
+* @brief Function implementing the App2 thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartApp2 */
+void StartApp2(void *argument)
+{
+  /* USER CODE BEGIN StartApp2 */
+  /* Infinite loop */
+  for(;;)
+  {
+	  printf("Hello from The new App 2 \r\n");
+	  osDelay(1000);
+  }
+  /* USER CODE END StartApp2 */
+}
+
+/**
+  * @brief  Period elapsed callback in non blocking mode
+  * @note   This function is called  when TIM6 interrupt took place, inside
+  * HAL_TIM_IRQHandler(). It makes a direct call to HAL_IncTick() to increment
+  * a global variable "uwTick" used as application time base.
+  * @param  htim : TIM handle
+  * @retval None
+  */
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
+{
+  /* USER CODE BEGIN Callback 0 */
+
+  /* USER CODE END Callback 0 */
+  if (htim->Instance == TIM6) {
+    HAL_IncTick();
+  }
+  /* USER CODE BEGIN Callback 1 */
+
+  /* USER CODE END Callback 1 */
+}
 
 /**
   * @brief  This function is executed in case of error occurrence.
