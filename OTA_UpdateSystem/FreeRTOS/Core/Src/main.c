@@ -667,7 +667,7 @@ void CANRxTask(void *argument)
 
 
             // Set the update complete flag when the last chunk is received and written
-            if (Address == FLASH_USER_END_ADDR_RX)
+            if (Address >= FLASH_USER_END_ADDR_RX)
             {
                 updateComplete = true;
 

@@ -329,8 +329,8 @@ void StartApp1(void *argument)
   /* Infinite loop */
   for(;;)
   {
-	  printf("Hello from The new App 1 \r\n");
-	  osDelay(1000);
+	  printf("Hello from the new App 1. \r\n");
+	  osDelay(3000);
   }
   /* USER CODE END 5 */
 }
@@ -348,8 +348,8 @@ void StartApp2(void *argument)
   /* Infinite loop */
   for(;;)
   {
-	  printf("Hello from The new App 2 \r\n");
-	  osDelay(1000);
+	  printf("Hello from the new App 2. \r\n");
+	  osDelay(3000);
   }
   /* USER CODE END StartApp2 */
 }
