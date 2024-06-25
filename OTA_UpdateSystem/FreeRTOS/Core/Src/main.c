@@ -108,7 +108,6 @@ enum board_status 	  	board_status = NO_UPDATE_AVAILABLE;
 // Flash Operation variables
 uint32_t FirstSector = 0, NbOfSectors = 0;
 uint32_t Address = FLASH_USER_START_ADDR_RX, SECTORError = 0;
-__IO uint32_t data32 = 0 , MemoryProgramStatus = 0;
 uint8_t TxBuffer;
 
 /*Variable used for Flash Erase procedure*/
@@ -131,7 +130,6 @@ void ShowBoardStatus(void *argument);
 void StartApp1(void *argument);
 void StartApp2(void *argument);
 void StartApp3(void *argument);
-void StartApp1_1(void *argument);
 
 /* USER CODE BEGIN PFP */
 void CANRxTask(void *argument);
@@ -612,15 +610,6 @@ void CANRxTask(void *argument)
     uint8_t buffer[sizeof(CAN_RxHeaderTypeDef) + sizeof(uint8_t[8])];
     CAN_RxHeaderTypeDef *pRxHeader = (CAN_RxHeaderTypeDef *)buffer;
     uint8_t *pRxData = buffer + sizeof(CAN_RxHeaderTypeDef);
-    uint32_t sector = GetSector(FLASH_USER_START_ADDR_RX);
-    uint32_t sectorsize = GetSectorSize(sector);
-
-//    // Declare the app1_1_attributes at the beginning of the function
-//    osThreadAttr_t app1_1_attributes = {
-//        .name = "app1.1",
-//        .stack_size = 128 * 4,
-//        .priority = (osPriority_t) osPriorityLow,
-//    };
 
     while (1)
     {
@@ -678,12 +667,6 @@ void CANRxTask(void *argument)
         if (updateComplete)
         {
         	printf("Update completed \r\n");
-            //osDelay(3000);    //Safety delay for launching it
-
-//            printf("Cerating a new task \r\n");
-//            osThreadNew(StartApp1_1, NULL, &app1_1_attributes);
-
-
             SystemReset();
         }
 
@@ -704,19 +687,6 @@ void StopAllThreads(void)
     vTaskSuspend(app2Handle);
     vTaskSuspend(app3Handle);
     // Add suspensions for any other threads if necessary
-}
-
-
-void StartApp1_1(void *argument)
-{
-  for(;;)
-  {
-      //printf("Hello from app 1.1\r\n");
-
-	  printf("About to try to relaunch with a new task \r\n");
-      //application1();
-      osDelay(1000);
-  }
 }
 
 

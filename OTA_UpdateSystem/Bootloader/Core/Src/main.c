@@ -133,22 +133,22 @@ int main(void)
 
   if(!Flash_Init())
   {
-	  printf("It does not init \r\n");
+	  printf("External memory not initialized. Check if it is connected properly.  \r\n");
   }
 
 
   // We perform a safety coppy of all the sectors in external SPI memory
   uint8_t *ptr1 = (uint8_t *)SECTOR_2_START_ADDRESS; //
   SPI_Flash_Write(0x90008000 ,ptr1,SECTOR_2_SIZE);
-  printf("Sector 2 coppied\r\n");
+  printf("Sector 2 copied\r\n");
 
   ptr1 = (uint8_t *)SECTOR_3_START_ADDRESS; //
   SPI_Flash_Write(0x9000C000,ptr1,SECTOR_3_SIZE);
-  printf("Sector 3 coppied\r\n");
+  printf("Sector 3 copied\r\n");
 
   ptr1 = (uint8_t *)SECTOR_4_START_ADDRESS; //
   SPI_Flash_Write(0x90010000,ptr1,SECTOR_4_SIZE);
-  printf("Sector 4 coppied\r\n");
+  printf("Sector 4 copied\r\n");
 
 
   // Copy sector 5 in two rounds of 64KB each
@@ -175,7 +175,6 @@ int main(void)
 
   printf("initflag: %lX \r\n", checkInitFlag());
   if (checkInitFlag() != INITIALIZATION_FLAG_VALUE){
-	  //writeInitFlag(INITIALIZATION_FLAG_VALUE);
 	  JumpToFreeRTOS();
   }
   else{
