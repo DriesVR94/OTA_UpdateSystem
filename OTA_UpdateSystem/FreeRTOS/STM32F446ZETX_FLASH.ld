@@ -54,9 +54,6 @@ MEMORY
   /*CUSTOM_SECTION_0 	(rx)	: ORIGIN = 0x08008000,		LENGTH = 16K	/* Flash sector 2 */
   CUSTOM_SECTION_1 	(rx)	: ORIGIN = 0x0800C000,		LENGTH = 16K	/* Flash sector 3 */
   CUSTOM_SECTION_2 	(rx)	: ORIGIN = 0x08010000,		LENGTH = 64K	/* Flash sector 4 */
-  CUSTOM_SECTION_3	(rx)	: ORIGIN = 0x08020000,		LENGTH = 128K	/* Flash sector 5 */
-  CUSTOM_SECTION_4	(rx)	: ORIGIN = 0x08040000,		LENGTH = 128K	/* Flash sector 6 */
-  
 }
 
 /* Sections */
@@ -75,16 +72,6 @@ SECTIONS
     *(.custom_section2)
   } > CUSTOM_SECTION_2
   
-  .custom_section3 :
-  {
-    *(.custom_section3)
-  } > CUSTOM_SECTION_3
-  
-  .custom_section4 :
-  {
-    *(.custom_section4)
-  } > CUSTOM_SECTION_4
-	
   /* The startup code into "FLASH" Rom type memory */
   .isr_vector :
   {

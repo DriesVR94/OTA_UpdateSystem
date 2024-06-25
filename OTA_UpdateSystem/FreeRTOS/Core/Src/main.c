@@ -59,6 +59,7 @@
 
 /* Private variables ---------------------------------------------------------*/
 CAN_HandleTypeDef hcan1;
+
 UART_HandleTypeDef huart3;
 
 /* Definitions for app0 */
@@ -73,19 +74,12 @@ osThreadId_t app1Handle;
 const osThreadAttr_t app1_attributes = {
   .name = "app1",
   .stack_size = 128 * 4,
-  .priority = (osPriority_t) osPriorityLow,
+  .priority = (osPriority_t) osPriorityLow1,
 };
 /* Definitions for app2 */
 osThreadId_t app2Handle;
 const osThreadAttr_t app2_attributes = {
   .name = "app2",
-  .stack_size = 128 * 4,
-  .priority = (osPriority_t) osPriorityLow1,
-};
-/* Definitions for app3 */
-osThreadId_t app3Handle;
-const osThreadAttr_t app3_attributes = {
-  .name = "app3",
   .stack_size = 128 * 4,
   .priority = (osPriority_t) osPriorityLow,
 };
@@ -126,10 +120,9 @@ void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_USART3_UART_Init(void);
 static void MX_CAN1_Init(void);
-void ShowBoardStatus(void *argument);
+void StartApp0(void *argument);
 void StartApp1(void *argument);
 void StartApp2(void *argument);
-void StartApp3(void *argument);
 
 /* USER CODE BEGIN PFP */
 void CANRxTask(void *argument);
@@ -158,6 +151,7 @@ static void writeInitFlag(uint32_t initFlag);
   */
 int main(void)
 {
+
   /* USER CODE BEGIN 1 */
 
   /* USER CODE END 1 */
@@ -220,16 +214,13 @@ int main(void)
 
   /* Create the thread(s) */
   /* creation of app0 */
-  app0Handle = osThreadNew(ShowBoardStatus, NULL, &app0_attributes);
+  app0Handle = osThreadNew(StartApp0, NULL, &app0_attributes);
 
   /* creation of app1 */
   app1Handle = osThreadNew(StartApp1, NULL, &app1_attributes);
 
   /* creation of app2 */
   app2Handle = osThreadNew(StartApp2, NULL, &app2_attributes);
-
-  /* creation of app3 */
-  app3Handle = osThreadNew(StartApp3, NULL, &app3_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
@@ -253,6 +244,7 @@ int main(void)
   osKernelStart();
 
   /* We should never get here as control is now taken by the scheduler */
+
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
@@ -621,13 +613,6 @@ void CANRxTask(void *argument)
             if (!flashErased)
             {
             	writeInitFlag(INITIALIZATION_FLAG_VALUE);
-                //First we delete thread of app1
-                printf("Erasing \r\n");
-
-                // Delete this task (app1) after the flag is set, indicating an update
-                vTaskDelete(app1Handle);
-                // Set the handle to NULL to indicate the task is deleted
-                app1Handle = NULL;
 
                 /* Get the 1st sector to erase */
                 FirstSector = GetSector(Address);
@@ -669,7 +654,6 @@ void CANRxTask(void *argument)
         	printf("Update completed \r\n");
             SystemReset();
         }
-
     }
 }
 
@@ -685,7 +669,6 @@ void StopAllThreads(void)
 {
     vTaskSuspend(app1Handle);
     vTaskSuspend(app2Handle);
-    vTaskSuspend(app3Handle);
     // Add suspensions for any other threads if necessary
 }
 
@@ -693,14 +676,14 @@ void StopAllThreads(void)
 
 /* USER CODE END 4 */
 
-/* USER CODE BEGIN Header_ShowBoardStatus */
+/* USER CODE BEGIN Header_StartApp0 */
 /**
   * @brief  Function implementing the app0 thread.
   * @param  argument: Not used
   * @retval None
   */
-/* USER CODE END Header_ShowBoardStatus */
-void ShowBoardStatus(void *argument)
+/* USER CODE END Header_StartApp0 */
+void StartApp0(void *argument)
 {
   /* USER CODE BEGIN 5 */
   /* Infinite loop */
@@ -729,23 +712,22 @@ void ShowBoardStatus(void *argument)
 
 /* USER CODE BEGIN Header_StartApp1 */
 /**
-  * @brief  Function implementing the app1 thread.
-  * @param  argument: Not used
-  * @retval None
-  */
+* @brief Function implementing the app1 thread.
+* @param argument: Not used
+* @retval None
+*/
 /* USER CODE END Header_StartApp1 */
 void StartApp1(void *argument)
 {
+  /* USER CODE BEGIN StartApp1 */
+  /* Infinite loop */
   for(;;)
   {
-
-	  //application1();
+	  application1();
 	  osDelay(1000);
-
   }
   /* USER CODE END StartApp1 */
 }
-
 
 /* USER CODE BEGIN Header_StartApp2 */
 /**
@@ -764,25 +746,6 @@ void StartApp2(void *argument)
 	  osDelay(1000);
   }
   /* USER CODE END StartApp2 */
-}
-
-/* USER CODE BEGIN Header_StartApp3 */
-/**
-* @brief Function implementing the app3 thread.
-* @param argument: Not used
-* @retval None
-*/
-/* USER CODE END Header_StartApp3 */
-void StartApp3(void *argument)
-{
-  /* USER CODE BEGIN StartApp3 */
-  /* Infinite loop */
-  for(;;)
-  {
-	  application3();
-	  osDelay(1000);
-  }
-  /* USER CODE END StartApp3 */
 }
 
 /**
