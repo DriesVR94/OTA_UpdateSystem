@@ -725,7 +725,7 @@ void StartApp1(void *argument)
   {
 	  if(!flag1)
 	  {
-		  writeInitFlag(STARTING_FLAG_VALUE);
+		  //writeInitFlag(STARTING_FLAG_VALUE);
 		  flag1=true;
 	  }
 

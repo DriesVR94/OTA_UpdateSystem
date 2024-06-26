@@ -432,6 +432,7 @@ void StartRefreshWDT(void *argument)
   {
 	  if (!Modify_Init_Flag)
 	  {
+		  HAL_IWDG_Refresh(&hiwdg);
 		  writeInitFlag(ERROR_UPDATE_FLAG_VALUE);
 		  Modify_Init_Flag = true;
 	  }
