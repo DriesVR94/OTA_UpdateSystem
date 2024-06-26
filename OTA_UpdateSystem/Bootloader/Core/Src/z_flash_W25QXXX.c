@@ -122,12 +122,52 @@ uint8_t buffer[1];
 
 static FLASH_EraseInitTypeDef EraseInitStruct;
 
+
+uint32_t GetSector(uint32_t Address)
+{
+  uint32_t sector = 0;
+
+  if((Address < ADDR_FLASH_SECTOR_1) && (Address >= ADDR_FLASH_SECTOR_0))
+  {
+    sector = FLASH_SECTOR_0;
+  }
+  else if((Address < ADDR_FLASH_SECTOR_2) && (Address >= ADDR_FLASH_SECTOR_1))
+  {
+    sector = FLASH_SECTOR_1;
+  }
+  else if((Address < ADDR_FLASH_SECTOR_3) && (Address >= ADDR_FLASH_SECTOR_2))
+  {
+    sector = FLASH_SECTOR_2;
+  }
+  else if((Address < ADDR_FLASH_SECTOR_4) && (Address >= ADDR_FLASH_SECTOR_3))
+  {
+    sector = FLASH_SECTOR_3;
+  }
+  else if((Address < ADDR_FLASH_SECTOR_5) && (Address >= ADDR_FLASH_SECTOR_4))
+  {
+    sector = FLASH_SECTOR_4;
+  }
+  else if((Address < ADDR_FLASH_SECTOR_6) && (Address >= ADDR_FLASH_SECTOR_5))
+  {
+    sector = FLASH_SECTOR_5;
+  }
+  else if((Address < ADDR_FLASH_SECTOR_7) && (Address >= ADDR_FLASH_SECTOR_6))
+  {
+    sector = FLASH_SECTOR_6;
+  }
+  else /* (Address < FLASH_END_ADDR) && (Address >= ADDR_FLASH_SECTOR_7) */
+  {
+    sector = FLASH_SECTOR_7;
+  }
+  return sector;
+}
+
 void CopyCodeFromSPIFlash(uint32_t addr_ext_flash, uint32_t addr_internal_flash, uint32_t code_size) {
     uint32_t FirstSector = 0, NbOfSectors = 0, SECTORError = 0;;
     uint8_t buffer[EXT_FLASH_PAGE_SIZE]; // Buffer for reading from external Flash
     uint32_t remaining_size = code_size;
     uint32_t addr_internal = addr_internal_flash;
-    uint32_t final_addr_internal = addr_internal +  GetSectorSize(addr_internal) -1;
+    uint32_t final_addr_internal = addr_internal +  code_size -1;
 
     HAL_FLASH_Unlock();
 
@@ -230,7 +270,7 @@ uint32_t inpage_addr;
  *  		data		buffer to fill with read data
  * 			dataSize	number of bytes to read
  **************************/
-void Flash_Read(uint32_t addr, uint8_t* data, uint32_t dataSize){
+void SPI_Flash_Read(uint32_t addr, uint8_t* data, uint32_t dataSize){
 uint16_t data_to_transfer;
 uint8_t buffer[5];
 
@@ -647,13 +687,13 @@ void DataReader_WaitForReceiveDone(){
 }
 
 void DataReader_ReadData(uint32_t address24, uint8_t* buffer, uint32_t length){
-	Flash_Read(address24, buffer, length);
+	SPI_Flash_Read(address24, buffer, length);
 }
 
 
 void DataReader_StartDMAReadData(uint32_t address24, uint8_t* buffer, uint32_t length){
 //currently using polling mode even if requested DMA
-	Flash_Read(address24, buffer, length);
+	SPI_Flash_Read(address24, buffer, length);
 }
 
 

@@ -157,6 +157,33 @@ int main(void)
   }
   else if(checkInitFlag() == ERROR_UPDATE_FLAG_VALUE) // The update had an error
   {
+	  printf("Error in Updated verion \r\n\n");
+
+	  printf("Restoring previous FreeRTOS version \r\n");
+
+	  /*printf("Restoring Sector 2\r\n");
+	  CopyCodeFromSPIFlash(0x90008000, SECTOR_2_START_ADDRESS, SECTOR_2_SIZE);
+
+	  printf("Restoring Sector 3\r\n");
+	  CopyCodeFromSPIFlash(0x9000C000, SECTOR_3_START_ADDRESS, SECTOR_3_SIZE);
+
+	  printf("Restoring Sector 4\r\n");
+	  CopyCodeFromSPIFlash(0x90010000, SECTOR_4_START_ADDRESS, SECTOR_4_SIZE);
+
+	  printf("Restoring Sector 5\r\n");
+	  CopyCodeFromSPIFlash(0x90020000, SECTOR_5_START_ADDRESS, 0x10000); 			//Sector 5 start Address
+	  CopyCodeFromSPIFlash(0x90030000, SECTOR_5_START_ADDRESS + 0x10000, 0x1000);
+
+	  printf("Restoring Sector 6\r\n");
+	  CopyCodeFromSPIFlash(0x90040000, SECTOR_6_START_ADDRESS, 0x10000); 			//Sector 5 start Address
+	  CopyCodeFromSPIFlash(0x90050000, SECTOR_6_START_ADDRESS + 0x10000, 0x1000);
+
+	  printf("Restoring Sector 7\r\n");
+	  CopyCodeFromSPIFlash(0x90060000, SECTOR_7_START_ADDRESS, 0x10000); 			//Sector 5 start Address
+	  CopyCodeFromSPIFlash(0x90070000, SECTOR_7_START_ADDRESS + 0x10000, 0x1000);*/
+
+
+	  printf("Relaunching previous version\r\n");
 	  JumpToFreeRTOS();
   }
   else

@@ -47,6 +47,7 @@
 #define FLASH_USER_END_ADDR_RX     ADDR_FLASH_SECTOR_6_END 			/* End @ of user Flash area */
 
 #define INITIALIZATION_FLAG_ADDRESS	0x0805FFFC
+#define STARTING_FLAG_VALUE			0XFFFFFFFF
 #define INITIALIZATION_FLAG_VALUE 	0xBBBBBBBB
 /* USER CODE END PD */
 
@@ -111,7 +112,7 @@ bool flashUpdateDone = false;
 bool flashErased = false;  // Add this line to declare the flashErased variable
 bool updateComplete = false;
 bool taskCreated = false;
-bool flag1;
+bool flag1 = false;
 
 /* USER CODE END PV */
 
@@ -253,7 +254,6 @@ int main(void)
 
     /* USER CODE BEGIN 3 */
 
-	  printf("in the while \r\n");
 
   }
   /* USER CODE END 3 */
@@ -723,6 +723,12 @@ void StartApp1(void *argument)
   /* Infinite loop */
   for(;;)
   {
+	  if(!flag1)
+	  {
+		  writeInitFlag(STARTING_FLAG_VALUE);
+		  flag1=true;
+	  }
+
 	  application1();
 	  osDelay(1000);
   }
