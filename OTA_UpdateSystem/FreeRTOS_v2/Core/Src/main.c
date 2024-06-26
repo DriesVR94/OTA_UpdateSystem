@@ -43,6 +43,8 @@
 /* Private variables ---------------------------------------------------------*/
 CAN_HandleTypeDef hcan1;
 
+IWDG_HandleTypeDef hiwdg;
+
 UART_HandleTypeDef huart3;
 
 /* Definitions for App1 */
@@ -59,6 +61,13 @@ const osThreadAttr_t App2_attributes = {
   .stack_size = 128 * 4,
   .priority = (osPriority_t) osPriorityLow,
 };
+/* Definitions for RefreshWDT */
+osThreadId_t RefreshWDTHandle;
+const osThreadAttr_t RefreshWDT_attributes = {
+  .name = "RefreshWDT",
+  .stack_size = 128 * 4,
+  .priority = (osPriority_t) osPriorityHigh,
+};
 /* USER CODE BEGIN PV */
 
 /* USER CODE END PV */
@@ -68,8 +77,10 @@ void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_CAN1_Init(void);
 static void MX_USART3_UART_Init(void);
+static void MX_IWDG_Init(void);
 void StartApp1(void *argument);
 void StartApp2(void *argument);
+void StartRefreshWDT(void *argument);
 
 /* USER CODE BEGIN PFP */
 
@@ -111,6 +122,7 @@ int main(void)
   MX_GPIO_Init();
   MX_CAN1_Init();
   MX_USART3_UART_Init();
+  MX_IWDG_Init();
   /* USER CODE BEGIN 2 */
 
   /* USER CODE END 2 */
@@ -140,6 +152,9 @@ int main(void)
 
   /* creation of App2 */
   App2Handle = osThreadNew(StartApp2, NULL, &App2_attributes);
+
+  /* creation of RefreshWDT */
+  RefreshWDTHandle = osThreadNew(StartRefreshWDT, NULL, &RefreshWDT_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
@@ -182,9 +197,10 @@ void SystemClock_Config(void)
   /** Initializes the RCC Oscillators according to the specified parameters
   * in the RCC_OscInitTypeDef structure.
   */
-  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI;
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI|RCC_OSCILLATORTYPE_LSI;
   RCC_OscInitStruct.HSIState = RCC_HSI_ON;
   RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
+  RCC_OscInitStruct.LSIState = RCC_LSI_ON;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSI;
   RCC_OscInitStruct.PLL.PLLM = 8;
@@ -246,6 +262,34 @@ static void MX_CAN1_Init(void)
   /* USER CODE BEGIN CAN1_Init 2 */
 
   /* USER CODE END CAN1_Init 2 */
+
+}
+
+/**
+  * @brief IWDG Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_IWDG_Init(void)
+{
+
+  /* USER CODE BEGIN IWDG_Init 0 */
+
+  /* USER CODE END IWDG_Init 0 */
+
+  /* USER CODE BEGIN IWDG_Init 1 */
+
+  /* USER CODE END IWDG_Init 1 */
+  hiwdg.Instance = IWDG;
+  hiwdg.Init.Prescaler = IWDG_PRESCALER_128;
+  hiwdg.Init.Reload = 499;
+  if (HAL_IWDG_Init(&hiwdg) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN IWDG_Init 2 */
+
+  /* USER CODE END IWDG_Init 2 */
 
 }
 
@@ -352,6 +396,26 @@ void StartApp2(void *argument)
 	  osDelay(3000);
   }
   /* USER CODE END StartApp2 */
+}
+
+/* USER CODE BEGIN Header_StartRefreshWDT */
+/**
+* @brief Function implementing the RefreshWDT thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartRefreshWDT */
+void StartRefreshWDT(void *argument)
+{
+  /* USER CODE BEGIN StartRefreshWDT */
+  /* Infinite loop */
+  for(;;)
+  {
+	//HAL_IWDG_Refresh(&hiwdg); // WDT timeout = 2 seconds (2000 ms)
+    osDelay(1500);
+
+  }
+  /* USER CODE END StartRefreshWDT */
 }
 
 /**
