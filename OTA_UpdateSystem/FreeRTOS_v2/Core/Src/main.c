@@ -23,6 +23,7 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include <stdio.h>
+#include <stdbool.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -32,7 +33,10 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+#define INITIALIZATION_FLAG_ADDRESS	0x0805FFFC
+#define ERROR_UPDATE_FLAG_VALUE 	0XCCCCCCCC
 
+bool Modify_Init_Flag = false;
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -46,6 +50,8 @@ CAN_HandleTypeDef hcan1;
 IWDG_HandleTypeDef hiwdg;
 
 UART_HandleTypeDef huart3;
+
+
 
 /* Definitions for App1 */
 osThreadId_t App1Handle;
@@ -358,6 +364,19 @@ int fputc(int ch, FILE *f)
 	return ch;
 }
 
+
+
+static void writeInitFlag(uint32_t initFlag){
+	HAL_FLASH_Unlock();
+
+    if (HAL_FLASH_Program(TYPEPROGRAM_WORD, INITIALIZATION_FLAG_ADDRESS, initFlag) != HAL_OK) {
+        // Error handling
+    	printf("Flag program error. \r\n");
+    }
+    HAL_FLASH_Lock();
+}
+
+
 /* USER CODE END 4 */
 
 /* USER CODE BEGIN Header_StartApp1 */
@@ -411,6 +430,11 @@ void StartRefreshWDT(void *argument)
   /* Infinite loop */
   for(;;)
   {
+	  if (!Modify_Init_Flag)
+	  {
+		  writeInitFlag(ERROR_UPDATE_FLAG_VALUE);
+		  Modify_Init_Flag = true;
+	  }
 	//HAL_IWDG_Refresh(&hiwdg); // WDT timeout = 2 seconds (2000 ms)
     osDelay(1500);
 

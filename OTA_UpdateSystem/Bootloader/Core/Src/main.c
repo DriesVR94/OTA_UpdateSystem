@@ -32,7 +32,10 @@
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 #define INITIALIZATION_FLAG_ADDRESS	0x0805FFFC
-#define INITIALIZATION_FLAG_VALUE 	0xBBBBBBBB
+
+#define STARTING_FLAG_VALUE			0XFFFFFFFF
+#define CORRECT_UPDATE_FLAG_VALUE 	0xBBBBBBBB
+#define ERROR_UPDATE_FLAG_VALUE		0xCCCCCCCC
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -137,48 +140,63 @@ int main(void)
   }
 
 
-  // We perform a safety coppy of all the sectors in external SPI memory
-  uint8_t *ptr1 = (uint8_t *)SECTOR_2_START_ADDRESS; //
-  SPI_Flash_Write(0x90008000 ,ptr1,SECTOR_2_SIZE);
-  printf("Sector 2 copied\r\n");
-
-  ptr1 = (uint8_t *)SECTOR_3_START_ADDRESS; //
-  SPI_Flash_Write(0x9000C000,ptr1,SECTOR_3_SIZE);
-  printf("Sector 3 copied\r\n");
-
-  ptr1 = (uint8_t *)SECTOR_4_START_ADDRESS; //
-  SPI_Flash_Write(0x90010000,ptr1,SECTOR_4_SIZE);
-  printf("Sector 4 copied\r\n");
-
-
-  // Copy sector 5 in two rounds of 64KB each
-  ptr1 = (uint8_t *)SECTOR_5_START_ADDRESS;
-  SPI_Flash_Write(0x90020000, ptr1, 0x10000);  // First 64KB
-  printf("Sector 5 part 1 copied\r\n");
-  SPI_Flash_Write(0x90030000, ptr1 + 0x10000, 0x10000);  // Second 64KB
-  printf("Sector 5 part 2 copied\r\n");
-
-  // Copy sector 6 in two rounds of 64KB each
-  ptr1 = (uint8_t *)SECTOR_6_START_ADDRESS;
-  SPI_Flash_Write(0x90040000, ptr1, 0x10000);  // First 64KB
-  printf("Sector 6 part 1 copied\r\n");
-  SPI_Flash_Write(0x90050000, ptr1 + 0x10000, 0x10000);  // Second 64KB
-  printf("Sector 6 part 2 copied\r\n");
-
-  // Copy sector 7 in two rounds of 64KB each			RTOS INSIDE
-  ptr1 = (uint8_t *)SECTOR_7_START_ADDRESS;
-  SPI_Flash_Write(0x90060000, ptr1, 0x10000);  // First 64KB
-  printf("Sector 7 part 1 copied\r\n");
-  SPI_Flash_Write(0x90070000, ptr1 + 0x10000, 0x10000);  // Second 64KB
-  printf("Sector 7 part 2 copied\r\n");
-
 
   printf("initflag: %lX \r\n", checkInitFlag());
+/*
   if (checkInitFlag() != INITIALIZATION_FLAG_VALUE){
 	  JumpToFreeRTOS();
   }
   else{
 	  JumpToUpdate();
+  }
+*/
+
+  if (checkInitFlag() == CORRECT_UPDATE_FLAG_VALUE )
+  {
+	  JumpToUpdate();
+  }
+  else if(checkInitFlag() == ERROR_UPDATE_FLAG_VALUE) // The update had an error
+  {
+	  JumpToFreeRTOS();
+  }
+  else
+  {
+	  // We perform a safety coppy of all the sectors in external SPI memory
+	  uint8_t *ptr1 = (uint8_t *)SECTOR_2_START_ADDRESS; //
+	  SPI_Flash_Write(0x90008000 ,ptr1,SECTOR_2_SIZE);
+	  printf("Sector 2 copied\r\n");
+
+	  ptr1 = (uint8_t *)SECTOR_3_START_ADDRESS; //
+	  SPI_Flash_Write(0x9000C000,ptr1,SECTOR_3_SIZE);
+	  printf("Sector 3 copied\r\n");
+
+	  ptr1 = (uint8_t *)SECTOR_4_START_ADDRESS; //
+	  SPI_Flash_Write(0x90010000,ptr1,SECTOR_4_SIZE);
+	  printf("Sector 4 copied\r\n");
+
+
+	  // Copy sector 5 in two rounds of 64KB each
+	  ptr1 = (uint8_t *)SECTOR_5_START_ADDRESS;
+	  SPI_Flash_Write(0x90020000, ptr1, 0x10000);  // First 64KB
+	  printf("Sector 5 part 1 copied\r\n");
+	  SPI_Flash_Write(0x90030000, ptr1 + 0x10000, 0x10000);  // Second 64KB
+	  printf("Sector 5 part 2 copied\r\n");
+
+	  // Copy sector 6 in two rounds of 64KB each
+	  ptr1 = (uint8_t *)SECTOR_6_START_ADDRESS;
+	  SPI_Flash_Write(0x90040000, ptr1, 0x10000);  // First 64KB
+	  printf("Sector 6 part 1 copied\r\n");
+	  SPI_Flash_Write(0x90050000, ptr1 + 0x10000, 0x10000);  // Second 64KB
+	  printf("Sector 6 part 2 copied\r\n");
+
+	  // Copy sector 7 in two rounds of 64KB each			RTOS INSIDE
+	  ptr1 = (uint8_t *)SECTOR_7_START_ADDRESS;
+	  SPI_Flash_Write(0x90060000, ptr1, 0x10000);  // First 64KB
+	  printf("Sector 7 part 1 copied\r\n");
+	  SPI_Flash_Write(0x90070000, ptr1 + 0x10000, 0x10000);  // Second 64KB
+	  printf("Sector 7 part 2 copied\r\n");
+
+	  JumpToFreeRTOS();
   }
 
   /* USER CODE END 2 */
