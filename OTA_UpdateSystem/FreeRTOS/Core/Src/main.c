@@ -91,6 +91,7 @@ const uint8_t			APP_Version[2]={MAJOR, MINOR};
 
 // CAN variables
 CAN_RxHeaderTypeDef   	RxHeader;
+CAN_TxHeaderTypeDef   	TxHeader;
 uint8_t               	TxData[8];
 uint8_t               	RxData[8];
 uint32_t              	TxMailbox;
@@ -137,7 +138,8 @@ uint32_t GetSector(uint32_t Address);
 uint32_t GetSectorSize(uint32_t Sector);
 uint32_t Read_Message_and_Write_in_FLASH(uint32_t StartSectorAddress, uint32_t EndSectorAddress, uint8_t *data, uint8_t length);
 static void writeInitFlag(uint32_t initFlag);
-
+static uint32_t GetFilterMatchingIndex(CAN_RxHeaderTypeDef *RxHeader);
+static uint32_t SetFlashSectorForWritingUpdate(uint32_t FilterMatchIndex);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -315,6 +317,8 @@ static void MX_CAN1_Init(void)
 
   /* USER CODE BEGIN CAN1_Init 0 */
   CAN_FilterTypeDef  sFilterConfig0;
+  CAN_FilterTypeDef	 sFilterConfig1;
+  CAN_FilterTypeDef	 sFilterConfig2;
   /* USER CODE END CAN1_Init 0 */
 
   /* USER CODE BEGIN CAN1_Init 1 */
@@ -348,7 +352,40 @@ static void MX_CAN1_Init(void)
   sFilterConfig0.FilterFIFOAssignment = CAN_RX_FIFO0;
   sFilterConfig0.FilterActivation = ENABLE;
   sFilterConfig0.SlaveStartFilterBank = 14;
+
   if (HAL_CAN_ConfigFilter(&hcan1, &sFilterConfig0) != HAL_OK) {
+	/* Filter configuration Error */
+	Error_Handler();
+  }
+
+  sFilterConfig1.FilterBank = 1;
+  sFilterConfig1.FilterMode = CAN_FILTERMODE_IDLIST;
+  sFilterConfig1.FilterScale = CAN_FILTERSCALE_32BIT;
+  sFilterConfig1.FilterIdHigh = 0x0020;
+  sFilterConfig1.FilterIdLow = 0x0000;
+  sFilterConfig1.FilterMaskIdHigh = 0x0000;
+  sFilterConfig1.FilterMaskIdLow = 0x0000;
+  sFilterConfig1.FilterFIFOAssignment = CAN_RX_FIFO0;
+  sFilterConfig1.FilterActivation = ENABLE;
+  sFilterConfig1.SlaveStartFilterBank = 14;
+
+  if (HAL_CAN_ConfigFilter(&hcan1, &sFilterConfig1) != HAL_OK) {
+	/* Filter configuration Error */
+	Error_Handler();
+  }
+
+  sFilterConfig2.FilterBank = 2;
+  sFilterConfig2.FilterMode = CAN_FILTERMODE_IDLIST;
+  sFilterConfig2.FilterScale = CAN_FILTERSCALE_32BIT;
+  sFilterConfig2.FilterIdHigh = 0x0040;
+  sFilterConfig2.FilterIdLow = 0x0000;
+  sFilterConfig2.FilterMaskIdHigh = 0x0000;
+  sFilterConfig2.FilterMaskIdLow = 0x0000;
+  sFilterConfig2.FilterFIFOAssignment = CAN_RX_FIFO0;
+  sFilterConfig2.FilterActivation = ENABLE;
+  sFilterConfig2.SlaveStartFilterBank = 14;
+
+  if (HAL_CAN_ConfigFilter(&hcan1, &sFilterConfig2) != HAL_OK) {
 	/* Filter configuration Error */
 	Error_Handler();
   }
@@ -454,6 +491,31 @@ static void writeInitFlag(uint32_t initFlag){
     HAL_FLASH_Lock();
 }
 
+static uint32_t GetFilterMatchingIndex(CAN_RxHeaderTypeDef *RxHeader)
+{
+	//printf("fmi: %lu \r\n", RxHeader->FilterMatchIndex);
+	if (RxHeader->FilterMatchIndex == 3){
+		printf("Filter Match Index: 3 \r\n");
+		printf("Incoming update. \r\n");
+	}
+
+	else {
+		printf("No Filter Match. Message Rejected. \r\n");
+	}
+
+	return RxHeader->FilterMatchIndex;
+}
+
+static uint32_t SetFlashSectorForWritingUpdate(uint32_t FilterMatchIndex){
+	if (FilterMatchIndex == 3){
+		Address = FLASH_USER_START_ADDR_RX;
+	}
+	else {
+		printf("No Filter Match. \r\n");
+	}
+	return Address;
+}
+
 /**
   * @brief  Gets the sector of a given address
   * @param  None
@@ -532,8 +594,24 @@ void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan)
     // Get the message
     if (HAL_CAN_GetRxMessage(hcan, CAN_RX_FIFO0, pRxHeader, pRxData) == HAL_OK)
     {
-        // Send the message to the queue
-        xQueueSendFromISR(canRxQueue, buffer, &xHigherPriorityTaskWoken);
+    	/* If the message holds the ID, we will reserve a flash sector for the coming update.
+    	 * After that, we will respond to the transmitter to confirm it can start sending the actual data.*/
+    	if ((pRxHeader->DLC == 1) && pRxData[0] == 0b00000000){
+        	uint32_t fmi = GetFilterMatchingIndex(pRxHeader);
+        	//printf("fmi: %lu \r\n", fmi);
+        	Address = SetFlashSectorForWritingUpdate(fmi);
+        	//printf("Start Address: %lX \r\n", Start_Address);
+
+        	/* Prepare the response and send it. */
+        	TxHeader.DLC = 1;
+        	TxData[0] = 0b11111111;
+        	HAL_CAN_AddTxMessage(&hcan1, &TxHeader, TxData, &TxMailbox);
+        	printf("response sent \r\n");
+    	}
+        // If the message contains actual data, we send it to the queue.
+    	else {
+            xQueueSendFromISR(canRxQueue, buffer, &xHigherPriorityTaskWoken);
+    	}
     }
 
     // Perform a context switch if required
